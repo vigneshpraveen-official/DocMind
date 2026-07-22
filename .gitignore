@@ -1,0 +1,31 @@
+# --- Secrets (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Java / Maven ---
+docmind-backend/target/
+docmind-backend/.mvn/wrapper/maven-wrapper.jar
+HELP.md
+
+# --- Node / React ---
+docmind-frontend/node_modules/
+docmind-frontend/dist/
+docmind-frontend/build/
+docmind-frontend/.vite/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.iml
+.claude/settings.local.json
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Logs ---
+*.log
+logs/
