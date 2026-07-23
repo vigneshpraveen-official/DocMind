@@ -23,8 +23,12 @@
 
 ## Current Phase
 
-**Phase 0 — Project scaffolding.** Repo structure, tracking docs, and git remote are being
-set up. Backend not yet scaffolded. No code written yet.
+**Phase 0 — Project scaffolding, blocked on JDK install.** `docmind-backend/` is scaffolded
+(Spring Boot 4.1.0, Java 17 target) with entities, repositories, and base config written, but
+**unverified — cannot compile yet**. This machine only has `openjdk-25-jre` installed (no
+`javac`). User has been asked to run `sudo apt install openjdk-25-jdk` (admin action, left to
+them per their instruction). Once confirmed, run `cd docmind-backend && ./mvnw compile` to
+verify before writing anything further — do not add more code on top of an unverified base.
 
 ---
 
@@ -37,6 +41,11 @@ set up. Backend not yet scaffolded. No code written yet.
 | 2026-07-22 | Generation model: `gemini-2.5-flash`. Embedding model: `gemini-embedding-001` (text-only, output dimension set to 768) | `text-embedding-004` (named in master doc) was deprecated/shut down Jan 2026. Confirmed current model IDs via ai.google.dev docs. Both are free-tier. Model names are externalized to config (`application.yml` / env vars), not hardcoded, so this is a one-line change later if needed. |
 | — | ⚠️ `gemini-2.5-flash` is scheduled for shutdown by Google on 2026-10-16 | Flagging so whoever deploys/demos this after that date checks `ai.google.dev/gemini-api/docs/changelog` and swaps the config value if needed. Not a code change. |
 | 2026-07-22 | Git workflow: direct commits to `main`, small logical commits (not one-per-file), plain conventional-ish messages, no AI-attribution footers | User requirement: repo must read as normal human solo-dev history. No feature-branch/PR workflow requested. |
+| 2026-07-22 | Spring Boot version: **4.1.0** (not 3.x as master doc assumed) | start.spring.io no longer offers 3.x at all (only 4.0.x/4.1.x) as of this build window; user chose to go with current GA rather than hand-building on an aging 3.x line. Note: Maven Central *does* still have 3.5.16 if this ever needs revisiting — 3.x isn't literally dead, just not offered via Initializr. Java target kept at 17 (Boot 4.1 still supports it). Real Spring Boot version strings on Maven Central have no `.RELEASE` suffix (e.g. `4.1.0`, not `4.1.0.RELEASE`) — start.spring.io's metadata API returns the old-style suffixed id, which does not resolve; had to correct the pom.xml parent version by hand after the first build failure. |
+| 2026-07-22 | `MessageRole` enum uses uppercase `USER`/`ASSISTANT` constants (Java convention), not the lowercase `'user'/'assistant'` literal in the master doc's SQL | Trivial naming deviation, applied to both the Java enum and the `messages.role` CHECK constraint in `V1__init_schema.sql` for consistency. |
+| 2026-07-22 | Added a `users` table (not in master doc's Section 4 DDL) with `id, username, email, password_hash, role, created_at` | Master doc's `documents.uploaded_by` and `conversation_sessions.user_id` reference `users(id)` but never defines the table — needed for the auth system described in Section 5. `role` is `ADMIN/STAFF/USER` per the API spec's role column. |
+| 2026-07-22 | `.env` loaded via Spring Boot's `spring.config.import: optional:file:.env[.properties]` (parses the .env as a properties file) rather than a third-party dotenv library | No extra dependency needed; officially supported Spring Boot config-import mechanism. Only works when the JVM's working directory is `docmind-backend/` (true for `./mvnw spring-boot:run`). |
+| 2026-07-22 | `SecurityConfig` currently permits all requests (stateless, CSRF disabled, no JWT yet) | Placeholder so the app can boot and the Postgres/Pinecone/Gemini connections can be verified before building full JWT auth (planned for the "Day 8" phase). **Not safe to deploy in this state** — flagged with a comment in the code itself too. Deployment (final phase) happens after auth is built, so this window never reaches production. |
 
 ---
 
@@ -87,8 +96,28 @@ None blocking right now. Resolved items moved to Decisions Log above.
 - [x] Resolved master doc's open items with user (frontend choice, credential status)
 - [x] `git init`, `.gitignore`, remote `origin` set
 - [x] Created this file and `guide.md`
-- [ ] Scaffold `docmind-backend/` via Spring Initializr
+- [x] Scaffold `docmind-backend/` via Spring Initializr (Spring Boot 4.1.0, Java 17, deps:
+      actuator, web, webflux, data-jpa, postgresql, security, validation, flyway, lombok,
+      configuration-processor)
+- [x] First commit (blueprint + tracking docs) pushed to local `main` — not yet pushed to
+      `origin` (ask before first push, per risky-action norms — will do once Day 1 verified working)
+- [x] `application.yml` written (env-var driven: DB, Gemini, Pinecone, JWT config namespaces)
+- [x] `.env.example` + local `.env` created in `docmind-backend/` (gitignored); JWT_SECRET
+      auto-generated, Gemini/Pinecone/Neon values still blank pending user input
+- [x] `V1__init_schema.sql` Flyway migration written (users, documents, chunks,
+      conversation_sessions, messages)
+- [x] JPA entities: `User`, `Document`, `Chunk`, `ConversationSession`, `Message` (+ `Role`,
+      `DocumentStatus`, `MessageRole` enums)
+- [x] Repositories: `UserRepository`, `DocumentRepository`, `ChunkRepository`,
+      `ConversationSessionRepository`, `MessageRepository`
+- [x] Config: `GeminiProperties`, `PineconeProperties`, `JwtProperties` (record-based
+      `@ConfigurationProperties`), `WebClientConfig` (two `WebClient` beans), `SecurityConfig`
+      (temporary permit-all, see Decisions Log)
+- [ ] **BLOCKED**: verify `./mvnw compile` succeeds — needs `openjdk-25-jdk` installed by user
+      (JRE-only machine, no `javac` currently). Nothing above has been compile-checked yet.
+- [ ] Once compiling: fill real credentials into `.env`, run `./mvnw spring-boot:run`, confirm
+      app boots and hits Postgres (Flyway migration applies cleanly)
 - [ ] Scaffold `docmind-frontend/` via Vite (later — Day 8 per timeline, not blocking backend work)
-- [ ] First commit + push to `origin/main`
+- [ ] Commit backend scaffold once verified; push to `origin/main` (ask user first)
 
 *(Next entries append below as phases complete — keep each phase's entry, don't overwrite.)*

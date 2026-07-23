@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: docmind-backend
+
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+docmind:
+  gemini:
+    api-key: ${GEMINI_API_KEY}
+    embedding-model: gemini-embedding-001
+    embedding-dimension: 768
+    generation-model: gemini-2.5-flash
+    base-url: https://generativelanguage.googleapis.com
+  pinecone:
+    api-key: ${PINECONE_API_KEY}
+    index-host: ${PINECONE_INDEX_HOST}
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+
+logging:
+  level:
+    com.docmind: DEBUG
