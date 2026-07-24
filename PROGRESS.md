@@ -23,12 +23,12 @@
 
 ## Current Phase
 
-**Phase 0 — Project scaffolding, blocked on JDK install.** `docmind-backend/` is scaffolded
-(Spring Boot 4.1.0, Java 17 target) with entities, repositories, and base config written, but
-**unverified — cannot compile yet**. This machine only has `openjdk-25-jre` installed (no
-`javac`). User has been asked to run `sudo apt install openjdk-25-jdk` (admin action, left to
-them per their instruction). Once confirmed, run `cd docmind-backend && ./mvnw compile` to
-verify before writing anything further — do not add more code on top of an unverified base.
+**Phase 1 — Day 1 Connection Verification (in progress).** Backend compiles cleanly.
+Added Gemini embedding service, Pinecone retrieval service, and connection verification logic.
+Services now available as Spring beans. Ready to test actual API connectivity:
+- Health endpoint: `GET /api/health` (shows connection status for all three services)
+- Startup verification: automatic health checks logged on application boot
+- Requires `.env` to be populated with Gemini, Pinecone, and Neon credentials (already collected from user)
 
 ---
 
@@ -89,7 +89,20 @@ None blocking right now. Resolved items moved to Decisions Log above.
 
 ## Phase Log
 
-### Phase 0 — Scaffolding (in progress, started 2026-07-22)
+### Phase 1 — Day 1 Connection Verification (in progress, started 2026-07-23)
+- [x] Created GeminiEmbeddingService (calls Gemini embedding API via WebClient)
+- [x] Created PineconeService (queries Pinecone via REST API)
+- [x] Created health check methods on both services
+- [x] Created ConnectionVerificationService (runs on app startup, logs all three connection statuses)
+- [x] Created HealthController (`GET /api/health`) for manual connection verification via HTTP
+- [x] All new code compiles cleanly
+- [ ] Run the app and test actual connectivity (awaiting user to start with `./mvnw spring-boot:run`)
+- [ ] Verify logs show all three services healthy
+- [ ] (Optional) Test `GET /api/health` endpoint manually via curl/Postman
+
+*(Next: Days 2-3 ingestion pipeline once connectivity confirmed.)*
+
+### Phase 0 — Scaffolding (completed 2026-07-23)
 - [x] Explored environment, confirmed toolchain (Java 25, no Maven binary, Node 22, git configured)
 - [x] Confirmed GitHub SSH auth works, remote repo exists and is empty
 - [x] Researched MCP Java SDK and current Gemini model names (see Decisions Log)
