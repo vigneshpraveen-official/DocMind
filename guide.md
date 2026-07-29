@@ -11,8 +11,10 @@ For build progress and internal decisions, see [PROGRESS.md](PROGRESS.md).
 
 ## Current status
 
-**Nothing runnable yet — scaffolding in progress.** This section will be replaced with real
-run instructions once the backend boots (Day 1).
+**Backend is running with document ingestion working (through Day 2).** Postgres, Gemini, and
+Pinecone connections are all verified on startup. You can upload a PDF, it gets extracted and
+chunked, and chunks are stored in Postgres (embedding + Pinecone upsert is Day 3 — chunks don't
+have real vectors yet, just placeholder IDs reserved for that step).
 
 ---
 
@@ -61,6 +63,41 @@ cd docmind-backend
 
 No system-wide Maven install needed — `mvnw` (the Maven Wrapper) downloads what it needs on
 first run.
+
+On startup, check the logs for:
+```
+Postgres: ✅ OK
+Gemini: ✅ OK
+Pinecone: ✅ OK
+```
+Or hit `GET http://localhost:8080/api/health` any time to check the same thing manually.
+
+---
+
+## Trying document upload (Day 2)
+
+Upload a PDF:
+```bash
+curl -F "file=@/path/to/your.pdf" http://localhost:8080/api/documents/upload
+```
+Returns the new document's id, status, and how many chunks were created.
+
+List all uploaded documents:
+```bash
+curl http://localhost:8080/api/documents
+```
+
+Inspect the chunks for one document (to sanity-check the extraction/chunking worked):
+```bash
+curl http://localhost:8080/api/documents/1/chunks
+```
+
+Notes:
+- Only `.pdf` files are accepted, max 20MB.
+- Scanned/image-only PDFs with no extractable text will come back with status `FAILED` — that's
+  expected, OCR isn't part of this project's scope.
+- Document status stays `PROCESSING` after upload — it only flips to `PROCESSED` once Day 3
+  (embedding + Pinecone upsert) runs. This is intentional, not a bug.
 
 ---
 

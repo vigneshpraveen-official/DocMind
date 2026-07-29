@@ -23,12 +23,15 @@
 
 ## Current Phase
 
-**Phase 1 — Day 1 Connection Verification (in progress).** Backend compiles cleanly.
-Added Gemini embedding service, Pinecone retrieval service, and connection verification logic.
-Services now available as Spring beans. Ready to test actual API connectivity:
-- Health endpoint: `GET /api/health` (shows connection status for all three services)
-- Startup verification: automatic health checks logged on application boot
-- Requires `.env` to be populated with Gemini, Pinecone, and Neon credentials (already collected from user)
+**Phase 1 — Day 2 Document Ingestion (in progress).** Day 1 connection verification is done and
+pushed. Day 2 adds the upload → extract → chunk → persist pipeline:
+- `POST /api/documents/upload` (multipart PDF upload)
+- `GET /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/chunks`
+- PDFBox text extraction (per-page), word-boundary sliding-window chunking (500 words / 50
+  overlap), chunks persisted to Postgres with a pre-generated `pinecone_vector_id` (UUID)
+- Embedding + Pinecone upsert (Day 3) will use those same UUIDs and flip document status to
+  `PROCESSED`
+- Compiles cleanly. Not yet manually tested end-to-end with a real PDF (pending user run).
 
 ---
 
@@ -46,6 +49,10 @@ Services now available as Spring beans. Ready to test actual API connectivity:
 | 2026-07-22 | Added a `users` table (not in master doc's Section 4 DDL) with `id, username, email, password_hash, role, created_at` | Master doc's `documents.uploaded_by` and `conversation_sessions.user_id` reference `users(id)` but never defines the table — needed for the auth system described in Section 5. `role` is `ADMIN/STAFF/USER` per the API spec's role column. |
 | 2026-07-22 | `.env` loaded via Spring Boot's `spring.config.import: optional:file:.env[.properties]` (parses the .env as a properties file) rather than a third-party dotenv library | No extra dependency needed; officially supported Spring Boot config-import mechanism. Only works when the JVM's working directory is `docmind-backend/` (true for `./mvnw spring-boot:run`). |
 | 2026-07-22 | `SecurityConfig` currently permits all requests (stateless, CSRF disabled, no JWT yet) | Placeholder so the app can boot and the Postgres/Pinecone/Gemini connections can be verified before building full JWT auth (planned for the "Day 8" phase). **Not safe to deploy in this state** — flagged with a comment in the code itself too. Deployment (final phase) happens after auth is built, so this window never reaches production. |
+| 2026-07-29 | Chunking uses word-boundary sliding window (split on whitespace, rejoin), not the master doc's raw character-substring example | Master doc's sample `chunkText()` slices by character offset, which can cut a word in half at every chunk boundary. Splitting on words first avoids that with no added dependency (no tokenizer library). Chunk size 500 words / 50 word overlap, approximating the spec's "~500 tokens, 50-token overlap" — words vs. tokens differ only in the constant factor, structurally identical. |
+| 2026-07-29 | PDFBox 3.0.1: PDF loading uses `org.apache.pdfbox.Loader.loadPDF(byte[])`, not `PDDocument.load(InputStream)` | PDFBox 3.x moved static loaders out of `PDDocument` into a dedicated `Loader` class; the old `PDDocument.load(...)` overloads used in most online examples (written for PDFBox 2.x) no longer exist. Discovered via compile error, not upfront research — flagging in case future PDFBox-touching code hits the same surprise. |
+| 2026-07-29 | Each `Chunk` gets a `pinecone_vector_id` (UUID) generated at chunk-creation time (Day 2), before any embedding exists | `chunks.pinecone_vector_id` is `NOT NULL` in the schema, but embedding/upsert doesn't happen until Day 3. Generating the UUID upfront avoids a schema/nullability change; Day 3 will reuse the same UUID as the Pinecone vector ID when it embeds and upserts, so Postgres and Pinecone stay linked by an ID that's stable from the moment the chunk is created. |
+| 2026-07-29 | `Document.status` stays `PROCESSING` after Day 2 ingestion succeeds (not flipped to `PROCESSED`) | `PROCESSED` should mean "fully searchable" (i.e., embedded + upserted to Pinecone), which doesn't happen until Day 3. Only sets `FAILED` on extraction error or zero extractable chunks (e.g., scanned/image-only PDFs — OCR is out of scope). |
 
 ---
 
@@ -89,13 +96,38 @@ None blocking right now. Resolved items moved to Decisions Log above.
 
 ## Phase Log
 
-### Phase 1 — Day 1 Connection Verification (in progress, started 2026-07-23)
+### Phase 1 — Day 2 Document Ingestion (in progress, started 2026-07-29)
+- [x] Added PDFBox 3.0.1 + commons-lang3 to `pom.xml`
+- [x] `DocumentExtractionService` — extracts text per-page from an uploaded PDF via PDFBox
+      (`Loader.loadPDF`, PDFBox 3.x API)
+- [x] `ChunkingService` — word-boundary sliding window chunking (500 words / 50 overlap,
+      configurable), avoids the naive character-substring approach's mid-word cuts
+- [x] `DocumentIngestionService` — orchestrates: validate upload (PDF only, non-empty) → save
+      `Document` (status `PROCESSING`) → extract per-page text → chunk each page → save `Chunk`
+      rows (each pre-assigned a UUID `pinecone_vector_id`) → `FAILED` on extraction error or zero
+      extractable text (e.g. scanned PDFs)
+- [x] `DocumentController` — `POST /api/documents/upload` (multipart), `GET /api/documents`,
+      `GET /api/documents/{id}`, `GET /api/documents/{id}/chunks`
+- [x] DTOs: `DocumentUploadResponse`, `DocumentSummaryResponse`, `ChunkResponse`
+- [x] `application.yml` — multipart upload limits (20MB max file/request size)
+- [x] All new code compiles cleanly (`./mvnw compile`)
+- [ ] Manual end-to-end test: upload a real PDF, confirm chunks appear correctly via
+      `GET /api/documents/{id}/chunks` (awaiting user to run and try it)
+- [ ] Commit + push Day 2 code
+
+*(Next: Day 3 — Gemini embedding of each chunk + Pinecone upsert using the reserved UUIDs,
+then flip `Document.status` to `PROCESSED`.)*
+
+### Phase 1 — Day 1 Connection Verification (code complete 2026-07-23, runtime unconfirmed)
 - [x] Created GeminiEmbeddingService (calls Gemini embedding API via WebClient)
 - [x] Created PineconeService (queries Pinecone via REST API)
 - [x] Created health check methods on both services
 - [x] Created ConnectionVerificationService (runs on app startup, logs all three connection statuses)
 - [x] Created HealthController (`GET /api/health`) for manual connection verification via HTTP
 - [x] All new code compiles cleanly
+- [x] Committed and pushed to `origin/main`
+- [ ] Not yet confirmed by an actual `./mvnw spring-boot:run` + log check — Day 2 work proceeded
+      on the assumption this works; if it doesn't, that's the first thing to debug
 - [ ] Run the app and test actual connectivity (awaiting user to start with `./mvnw spring-boot:run`)
 - [ ] Verify logs show all three services healthy
 - [ ] (Optional) Test `GET /api/health` endpoint manually via curl/Postman
