@@ -16,7 +16,14 @@ public class GeminiEmbeddingService {
     private final WebClient webClient;
     private final GeminiProperties geminiProperties;
 
+    public static final String TASK_TYPE_DOCUMENT = "RETRIEVAL_DOCUMENT";
+    public static final String TASK_TYPE_QUERY = "RETRIEVAL_QUERY";
+
     public float[] embed(String text) {
+        return embed(text, TASK_TYPE_DOCUMENT);
+    }
+
+    public float[] embed(String text, String taskType) {
         String url = String.format(
             "%s/v1beta/models/%s:embedContent?key=%s",
             geminiProperties.baseUrl(),
@@ -24,7 +31,7 @@ public class GeminiEmbeddingService {
             geminiProperties.apiKey()
         );
 
-        GeminiEmbedRequest request = GeminiEmbedRequest.of(text);
+        GeminiEmbedRequest request = GeminiEmbedRequest.of(text, taskType, geminiProperties.embeddingDimension());
 
         GeminiEmbedResponse response = webClient.post()
             .uri(url)

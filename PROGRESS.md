@@ -23,15 +23,13 @@
 
 ## Current Phase
 
-**Phase 1 — Day 2 Document Ingestion (in progress).** Day 1 connection verification is done and
-pushed. Day 2 adds the upload → extract → chunk → persist pipeline:
-- `POST /api/documents/upload` (multipart PDF upload)
-- `GET /api/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/chunks`
-- PDFBox text extraction (per-page), word-boundary sliding-window chunking (500 words / 50
-  overlap), chunks persisted to Postgres with a pre-generated `pinecone_vector_id` (UUID)
-- Embedding + Pinecone upsert (Day 3) will use those same UUIDs and flip document status to
-  `PROCESSED`
-- Compiles cleanly. Not yet manually tested end-to-end with a real PDF (pending user run).
+**Phase 1 — Day 3 Embedding + Vector Indexing (in progress).** The full ingestion pipeline is
+now wired end to end: upload → extract → chunk → save to Postgres → embed each chunk via Gemini
+→ upsert to Pinecone → flip `Document.status` to `PROCESSED`. Fixed a real bug found along the
+way (see Decisions Log, 2026-07-30): Gemini embed requests weren't specifying
+`outputDimensionality`, so they'd have returned 3072-dim vectors instead of the 768 our Pinecone
+index expects — this would have broken Day 1's health check and any Day 3 upsert. Compiles
+cleanly. Not yet manually tested end-to-end with a real PDF (pending user run).
 
 ---
 
@@ -53,6 +51,11 @@ pushed. Day 2 adds the upload → extract → chunk → persist pipeline:
 | 2026-07-29 | PDFBox 3.0.1: PDF loading uses `org.apache.pdfbox.Loader.loadPDF(byte[])`, not `PDDocument.load(InputStream)` | PDFBox 3.x moved static loaders out of `PDDocument` into a dedicated `Loader` class; the old `PDDocument.load(...)` overloads used in most online examples (written for PDFBox 2.x) no longer exist. Discovered via compile error, not upfront research — flagging in case future PDFBox-touching code hits the same surprise. |
 | 2026-07-29 | Each `Chunk` gets a `pinecone_vector_id` (UUID) generated at chunk-creation time (Day 2), before any embedding exists | `chunks.pinecone_vector_id` is `NOT NULL` in the schema, but embedding/upsert doesn't happen until Day 3. Generating the UUID upfront avoids a schema/nullability change; Day 3 will reuse the same UUID as the Pinecone vector ID when it embeds and upserts, so Postgres and Pinecone stay linked by an ID that's stable from the moment the chunk is created. |
 | 2026-07-29 | `Document.status` stays `PROCESSING` after Day 2 ingestion succeeds (not flipped to `PROCESSED`) | `PROCESSED` should mean "fully searchable" (i.e., embedded + upserted to Pinecone), which doesn't happen until Day 3. Only sets `FAILED` on extraction error or zero extractable chunks (e.g., scanned/image-only PDFs — OCR is out of scope). |
+| 2026-07-29 | Ingestion services live in `service.document` (not `service.ingestion` / `service.embedding` split exactly as master doc's suggested tree shows) | Minor, harmless deviation from the master doc's illustrative package layout — `DocumentExtractionService`, `ChunkingService`, `DocumentIngestionService` all live together in `service/document/`. `GeminiEmbeddingService` (`service/embedding/`) and `PineconeService` (`service/retrieval/`) do match the master doc. Flagging only so a future agent doesn't go looking for a `service.ingestion` package that doesn't exist. |
+| 2026-07-30 | **Bug fix:** `GeminiEmbedRequest` now sends `taskType` and `outputDimensionality` in the embedContent request body; previously sent neither | Without `outputDimensionality`, `gemini-embedding-001` returns its default 3072-dim vector, not the 768 dims our Pinecone index is provisioned for — every upsert would have failed with a dimension mismatch, and Day 1's Gemini health check (`embedding.length == 768`) would have silently returned `false` even with a working API key. Found while wiring Day 3, not by the user reporting it — worth a runtime re-check of Day 1's health endpoint since this changes its actual behavior. `taskType` also added since Gemini's embedding model is asymmetric: `RETRIEVAL_DOCUMENT` for chunks going into the index (Day 3, what's implemented now), `RETRIEVAL_QUERY` for the user's question at search time (Day 4, constant already defined as `GeminiEmbeddingService.TASK_TYPE_QUERY` — not yet called anywhere). Using the wrong task type doesn't error, it just quietly degrades retrieval relevance, so this was worth getting right now rather than patching later. |
+| 2026-07-30 | Pinecone vector metadata includes the full chunk text (`documentId`, `chunkId`, `filename`, `pageNumber`, `text`) | Standard RAG pattern: storing chunk text directly in Pinecone metadata means Day 4's query step can build a grounded prompt straight from Pinecone's response, no extra Postgres round-trip needed. Chunk size (~500 words) is well under Pinecone's per-vector metadata limit. |
+| 2026-07-30 | Removed `@Transactional` from `DocumentIngestionService.ingest()` | The method now makes sequential external HTTP calls (Gemini embed per chunk, Pinecone upsert) — wrapping that in a single Spring-managed DB transaction would hold a Postgres connection open for the entire external-call duration, which doesn't scale and isn't good practice. Each repository `save`/`saveAll` call still gets its own implicit transaction from Spring Data JPA; this project doesn't need cross-call atomicity badly enough to justify a manual transaction-scoping workaround (e.g. saving twice — once as PROCESSING, again as PROCESSED/FAILED — is an acceptable eventual-consistency window for a single-user portfolio project). |
+| 2026-07-30 | Pinecone `upsert()` batches vectors in groups of 100 | Matches Pinecone's own guidance for upsert request size; irrelevant for small test PDFs but avoids a payload-size failure on a large document with hundreds of chunks. |
 
 ---
 
@@ -96,7 +99,28 @@ None blocking right now. Resolved items moved to Decisions Log above.
 
 ## Phase Log
 
-### Phase 1 — Day 2 Document Ingestion (in progress, started 2026-07-29)
+### Phase 1 — Day 3 Embedding + Vector Indexing (in progress, started 2026-07-30)
+- [x] **Bug fix:** `GeminiEmbedRequest` now includes `taskType` + `outputDimensionality`
+      (previously missing — see Decisions Log 2026-07-30 for why this mattered)
+- [x] `GeminiEmbeddingService.embed(text, taskType)` overload added; `TASK_TYPE_DOCUMENT` and
+      `TASK_TYPE_QUERY` constants defined (`RETRIEVAL_DOCUMENT` used now, `RETRIEVAL_QUERY`
+      reserved for Day 4's query embedding)
+- [x] New DTOs: `PineconeVector`, `PineconeUpsertRequest`, `PineconeUpsertResponse`
+- [x] `PineconeService.upsert(List<PineconeVector>)` — batches in groups of 100
+- [x] `DocumentIngestionService.ingest()` now runs the full pipeline: extract → chunk → save
+      chunks → embed each chunk (Gemini) → upsert to Pinecone (with `documentId`, `chunkId`,
+      `filename`, `pageNumber`, `text` as metadata) → set `Document.status = PROCESSED`
+- [x] `@Transactional` removed from `ingest()` (see Decisions Log — external HTTP calls shouldn't
+      sit inside a DB transaction)
+- [x] All new code compiles cleanly (`./mvnw compile`)
+- [ ] Manual end-to-end test: upload a real PDF, confirm status reaches `PROCESSED` and vectors
+      are queryable in the Pinecone console (awaiting user run)
+- [ ] Commit + push Day 3 code
+
+*(Next: Day 4 — embed the user's question with `TASK_TYPE_QUERY`, query Pinecone top-k, build a
+grounded prompt, call Gemini generation.)*
+
+### Phase 1 — Day 2 Document Ingestion (completed 2026-07-29)
 - [x] Added PDFBox 3.0.1 + commons-lang3 to `pom.xml`
 - [x] `DocumentExtractionService` — extracts text per-page from an uploaded PDF via PDFBox
       (`Loader.loadPDF`, PDFBox 3.x API)
@@ -111,12 +135,10 @@ None blocking right now. Resolved items moved to Decisions Log above.
 - [x] DTOs: `DocumentUploadResponse`, `DocumentSummaryResponse`, `ChunkResponse`
 - [x] `application.yml` — multipart upload limits (20MB max file/request size)
 - [x] All new code compiles cleanly (`./mvnw compile`)
+- [x] Committed and pushed to `origin/main`
 - [ ] Manual end-to-end test: upload a real PDF, confirm chunks appear correctly via
-      `GET /api/documents/{id}/chunks` (awaiting user to run and try it)
-- [ ] Commit + push Day 2 code
-
-*(Next: Day 3 — Gemini embedding of each chunk + Pinecone upsert using the reserved UUIDs,
-then flip `Document.status` to `PROCESSED`.)*
+      `GET /api/documents/{id}/chunks` — still not confirmed by an actual run; Day 3 built on
+      top of this anyway (chunking logic didn't change, low risk)
 
 ### Phase 1 — Day 1 Connection Verification (code complete 2026-07-23, runtime unconfirmed)
 - [x] Created GeminiEmbeddingService (calls Gemini embedding API via WebClient)

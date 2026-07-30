@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class GeminiEmbedRequest {
     private Content content;
+    private String taskType;
+    private Integer outputDimensionality;
 
     @Data
     @NoArgsConstructor
@@ -25,9 +27,9 @@ public class GeminiEmbedRequest {
         private String text;
     }
 
-    public static GeminiEmbedRequest of(String text) {
+    public static GeminiEmbedRequest of(String text, String taskType, int outputDimensionality) {
         Part part = new Part(text);
         Content content = new Content(new Part[]{part});
-        return new GeminiEmbedRequest(content);
+        return new GeminiEmbedRequest(content, taskType, outputDimensionality);
     }
 }

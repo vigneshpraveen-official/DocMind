@@ -11,10 +11,16 @@ For build progress and internal decisions, see [PROGRESS.md](PROGRESS.md).
 
 ## Current status
 
-**Backend is running with document ingestion working (through Day 2).** Postgres, Gemini, and
-Pinecone connections are all verified on startup. You can upload a PDF, it gets extracted and
-chunked, and chunks are stored in Postgres (embedding + Pinecone upsert is Day 3 — chunks don't
-have real vectors yet, just placeholder IDs reserved for that step).
+**Full ingestion pipeline works end to end (through Day 3).** Upload a PDF and it gets
+extracted, chunked, embedded via Gemini, and upserted into Pinecone — the document's status
+flips to `PROCESSED` once it's fully searchable. There's no search/chat endpoint yet — the
+vectors are sitting in Pinecone ready to be queried, but the query side (Day 4) doesn't exist
+yet.
+
+Along the way I found and fixed a real bug: the Gemini embed request wasn't specifying an output
+dimension, so it would have silently returned 3072-dim vectors instead of the 768 our Pinecone
+index expects. If you tried the Day 1 health check before now and Gemini showed unhealthy, that
+was probably why — worth re-checking `GET /api/health` now that it's fixed.
 
 ---
 
@@ -74,15 +80,19 @@ Or hit `GET http://localhost:8080/api/health` any time to check the same thing m
 
 ---
 
-## Trying document upload (Day 2)
+## Trying document upload (Day 2 + 3)
 
 Upload a PDF:
 ```bash
 curl -F "file=@/path/to/your.pdf" http://localhost:8080/api/documents/upload
 ```
-Returns the new document's id, status, and how many chunks were created.
+This now runs the whole pipeline synchronously — extraction, chunking, embedding every chunk via
+Gemini, and upserting to Pinecone — so for a multi-page PDF the request may take a while (one
+Gemini API call per chunk, sequentially). Returns the new document's id, final status, and how
+many chunks were created. Status should be `PROCESSED` if everything worked, `FAILED` if
+extraction found no text or embedding/upsert hit an error partway through.
 
-List all uploaded documents:
+List all uploaded documents (check status here too):
 ```bash
 curl http://localhost:8080/api/documents
 ```
@@ -92,12 +102,17 @@ Inspect the chunks for one document (to sanity-check the extraction/chunking wor
 curl http://localhost:8080/api/documents/1/chunks
 ```
 
+To confirm vectors actually landed in Pinecone, open the Pinecone console for the `docmind`
+index and check the vector count — it should match the chunk count from the upload response.
+
 Notes:
 - Only `.pdf` files are accepted, max 20MB.
 - Scanned/image-only PDFs with no extractable text will come back with status `FAILED` — that's
   expected, OCR isn't part of this project's scope.
-- Document status stays `PROCESSING` after upload — it only flips to `PROCESSED` once Day 3
-  (embedding + Pinecone upsert) runs. This is intentional, not a bug.
+- If status comes back `FAILED` after chunks were clearly created, check the server logs —
+  it likely means the Gemini or Pinecone call failed partway (bad API key, rate limit, network).
+  The chunks stay in Postgres either way; nothing needs to be re-uploaded once the underlying
+  issue is fixed (Day 4+ could add a re-embed endpoint if that becomes annoying — not built yet).
 
 ---
 

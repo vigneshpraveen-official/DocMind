@@ -1,0 +1,12 @@
+package com.docmind.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class PineconeUpsertResponse {
+    private int upsertedCount;
+}
