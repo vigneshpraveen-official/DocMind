@@ -11,16 +11,16 @@ For build progress and internal decisions, see [PROGRESS.md](PROGRESS.md).
 
 ## Current status
 
-**Full ingestion pipeline works end to end (through Day 3).** Upload a PDF and it gets
-extracted, chunked, embedded via Gemini, and upserted into Pinecone — the document's status
-flips to `PROCESSED` once it's fully searchable. There's no search/chat endpoint yet — the
-vectors are sitting in Pinecone ready to be queried, but the query side (Day 4) doesn't exist
-yet.
+**Baseline RAG works end to end (through Day 4).** Upload a PDF (Day 2-3: extracted, chunked,
+embedded, upserted to Pinecone), then ask a question about it (Day 4: your question gets
+embedded, matched against Pinecone, and answered by Gemini using only the retrieved chunks as
+context, with sources cited). No MCP tool-calling yet (Days 6-7), no chat history / sessions yet
+(Day 8 — right now `/api/chat/query` is stateless, nothing is saved to Postgres per-question).
 
-Along the way I found and fixed a real bug: the Gemini embed request wasn't specifying an output
-dimension, so it would have silently returned 3072-dim vectors instead of the 768 our Pinecone
-index expects. If you tried the Day 1 health check before now and Gemini showed unhealthy, that
-was probably why — worth re-checking `GET /api/health` now that it's fixed.
+Along the way (Day 3) I found and fixed a real bug: the Gemini embed request wasn't specifying
+an output dimension, so it would have silently returned 3072-dim vectors instead of the 768 our
+Pinecone index expects. If you tried the Day 1 health check before now and Gemini showed
+unhealthy, that was probably why — worth re-checking `GET /api/health` now that it's fixed.
 
 ---
 
@@ -113,6 +113,37 @@ Notes:
   it likely means the Gemini or Pinecone call failed partway (bad API key, rate limit, network).
   The chunks stay in Postgres either way; nothing needs to be re-uploaded once the underlying
   issue is fixed (Day 4+ could add a re-embed endpoint if that becomes annoying — not built yet).
+
+---
+
+## Trying a chat query (Day 4)
+
+Once at least one document has status `PROCESSED` (check via `GET /api/documents`), ask it a
+question:
+```bash
+curl -X POST http://localhost:8080/api/chat/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is the leave policy for interns?"}'
+```
+
+Response shape:
+```json
+{
+  "answer": "According to the document, ...",
+  "sources": [
+    { "documentId": 1, "filename": "hr-policy.pdf", "page": 12 }
+  ]
+}
+```
+
+Things worth trying to get a feel for how grounded it actually is:
+- Ask something the document clearly answers — check the answer is accurate and `sources` points
+  at the right page.
+- Ask something totally unrelated to your uploaded documents — it should say it doesn't have
+  that information, not make something up. This is the actual behavior Day 5 will measure and
+  put a real number on.
+- If no documents are indexed yet at all, it short-circuits to a canned "nothing indexed" answer
+  without calling Gemini — that's intentional, not a bug.
 
 ---
 

@@ -23,13 +23,13 @@
 
 ## Current Phase
 
-**Phase 1 — Day 3 Embedding + Vector Indexing (in progress).** The full ingestion pipeline is
-now wired end to end: upload → extract → chunk → save to Postgres → embed each chunk via Gemini
-→ upsert to Pinecone → flip `Document.status` to `PROCESSED`. Fixed a real bug found along the
-way (see Decisions Log, 2026-07-30): Gemini embed requests weren't specifying
-`outputDimensionality`, so they'd have returned 3072-dim vectors instead of the 768 our Pinecone
-index expects — this would have broken Day 1's health check and any Day 3 upsert. Compiles
-cleanly. Not yet manually tested end-to-end with a real PDF (pending user run).
+**Phase 1 — Day 4 Query + Grounded Generation (in progress).** Baseline RAG query flow is live:
+`POST /api/chat/query` embeds the question (`RETRIEVAL_QUERY` task type), searches Pinecone for
+the top-5 most similar chunks, builds a grounded prompt from the master doc's system instruction,
+calls Gemini generation (`gemini-2.5-flash`, temperature 0.2), and returns `{ answer, sources }`.
+No MCP yet (Days 6-7) and no session/message persistence yet (Day 8, per the master doc's
+timeline — this endpoint is intentionally stateless for now, see Decisions Log). Compiles
+cleanly. Not yet manually tested with a real question against real indexed data.
 
 ---
 
@@ -56,6 +56,10 @@ cleanly. Not yet manually tested end-to-end with a real PDF (pending user run).
 | 2026-07-30 | Pinecone vector metadata includes the full chunk text (`documentId`, `chunkId`, `filename`, `pageNumber`, `text`) | Standard RAG pattern: storing chunk text directly in Pinecone metadata means Day 4's query step can build a grounded prompt straight from Pinecone's response, no extra Postgres round-trip needed. Chunk size (~500 words) is well under Pinecone's per-vector metadata limit. |
 | 2026-07-30 | Removed `@Transactional` from `DocumentIngestionService.ingest()` | The method now makes sequential external HTTP calls (Gemini embed per chunk, Pinecone upsert) — wrapping that in a single Spring-managed DB transaction would hold a Postgres connection open for the entire external-call duration, which doesn't scale and isn't good practice. Each repository `save`/`saveAll` call still gets its own implicit transaction from Spring Data JPA; this project doesn't need cross-call atomicity badly enough to justify a manual transaction-scoping workaround (e.g. saving twice — once as PROCESSING, again as PROCESSED/FAILED — is an acceptable eventual-consistency window for a single-user portfolio project). |
 | 2026-07-30 | Pinecone `upsert()` batches vectors in groups of 100 | Matches Pinecone's own guidance for upsert request size; irrelevant for small test PDFs but avoids a payload-size failure on a large document with hundreds of chunks. |
+| 2026-07-31 | `POST /api/chat/query` takes only `{ question }` — no `sessionId`, nothing written to `conversation_sessions`/`messages` yet, unlike the master doc's sample request/response in Section 5 | Master doc's own timeline (Section 9) explicitly scopes "session/message persistence" to Day 8, alongside JWT auth. Sessions without auth have no real owner concept yet, so building session plumbing now means redoing it once users exist. Keeping Day 4 stateless avoids that throwaway work — Day 8 will add `sessionId` to the request and persist both the user's question and the answer as `Message` rows. |
+| 2026-07-31 | Grounded prompt uses the master doc's system instruction (Section 6) verbatim, with one addition: each context chunk is labeled `[Source: {filename}, page {N}]` above its text | The master doc's instruction says "cite which section supports your answer" but the raw context chunks it shows have no labels to cite by. Adding the label lets Gemini's citation actually reference something concrete, and gives us a prompt worth using as Day 5's "refined" baseline (vs. a naive unlabeled/no-instruction prompt) rather than needing to invent one from scratch then. |
+| 2026-07-31 | Generation temperature set to 0.2 (low, not default ~1.0) | Grounded factual Q&A benefits from low temperature — less creative rephrasing, less chance of drifting from the provided context. Not in the master doc's snippet, but directly serves the project's core "reduce hallucination" goal, so worth setting deliberately now rather than leaving at the API default. |
+| 2026-07-31 | If Pinecone returns zero matches (empty index), skip the Gemini generation call entirely and return a canned "I don't have information on that" response | No context means there's nothing for Gemini to ground an answer in — calling it anyway would just burn an API call for a foregone conclusion. If Pinecone returns matches but they're weakly relevant, they're still passed through to Gemini rather than filtered by a score threshold — deciding "is this actually relevant" is left to the grounding instruction itself, which is exactly what Day 5's eval set is designed to test. |
 
 ---
 
@@ -99,7 +103,26 @@ None blocking right now. Resolved items moved to Decisions Log above.
 
 ## Phase Log
 
-### Phase 1 — Day 3 Embedding + Vector Indexing (in progress, started 2026-07-30)
+### Phase 1 — Day 4 Query + Grounded Generation (in progress, started 2026-07-31)
+- [x] New DTOs: `GeminiGenerateRequest`/`Response`, `ChatQueryRequest`/`Response`, `SourceReference`
+- [x] `GeminiGenerationService.generate(prompt)` — calls `generateContent` on `gemini-2.5-flash`,
+      temperature 0.2
+- [x] `RetrievedChunk` record + `PromptBuilder.buildGroundedPrompt(question, chunks)` — master
+      doc's grounding instruction verbatim, plus `[Source: filename, page N]` labels per chunk
+      (see Decisions Log for why)
+- [x] `ChatService` orchestrator (`service/chat/`) — embeds question with `RETRIEVAL_QUERY`,
+      queries Pinecone top-5, short-circuits to a canned response on zero matches, otherwise
+      builds the prompt, calls generation, and returns deduped `sources`
+- [x] `ChatController` — `POST /api/chat/query`, `@Valid`-checked `{ question }` body
+- [x] All new code compiles cleanly (`./mvnw compile`)
+- [ ] Manual end-to-end test: ask a real question against a document ingested in Day 2/3, confirm
+      `answer` is grounded and `sources` point at the right document/page (awaiting user run)
+- [ ] Commit + push Day 4 code
+
+*(Next: Day 5 — build a 15-20 question eval set, run it once with a naive prompt and once with
+this refined one, record the real hallucination-reduction % for the resume.)*
+
+### Phase 1 — Day 3 Embedding + Vector Indexing (completed 2026-07-30)
 - [x] **Bug fix:** `GeminiEmbedRequest` now includes `taskType` + `outputDimensionality`
       (previously missing — see Decisions Log 2026-07-30 for why this mattered)
 - [x] `GeminiEmbeddingService.embed(text, taskType)` overload added; `TASK_TYPE_DOCUMENT` and
@@ -113,12 +136,10 @@ None blocking right now. Resolved items moved to Decisions Log above.
 - [x] `@Transactional` removed from `ingest()` (see Decisions Log — external HTTP calls shouldn't
       sit inside a DB transaction)
 - [x] All new code compiles cleanly (`./mvnw compile`)
+- [x] Committed and pushed to `origin/main`
 - [ ] Manual end-to-end test: upload a real PDF, confirm status reaches `PROCESSED` and vectors
-      are queryable in the Pinecone console (awaiting user run)
-- [ ] Commit + push Day 3 code
-
-*(Next: Day 4 — embed the user's question with `TASK_TYPE_QUERY`, query Pinecone top-k, build a
-grounded prompt, call Gemini generation.)*
+      are queryable in the Pinecone console — still not confirmed by an actual run; Day 4 built
+      on top of this anyway (query side is independently testable once any doc is indexed)
 
 ### Phase 1 — Day 2 Document Ingestion (completed 2026-07-29)
 - [x] Added PDFBox 3.0.1 + commons-lang3 to `pom.xml`
@@ -148,13 +169,10 @@ grounded prompt, call Gemini generation.)*
 - [x] Created HealthController (`GET /api/health`) for manual connection verification via HTTP
 - [x] All new code compiles cleanly
 - [x] Committed and pushed to `origin/main`
-- [ ] Not yet confirmed by an actual `./mvnw spring-boot:run` + log check — Day 2 work proceeded
-      on the assumption this works; if it doesn't, that's the first thing to debug
-- [ ] Run the app and test actual connectivity (awaiting user to start with `./mvnw spring-boot:run`)
-- [ ] Verify logs show all three services healthy
-- [ ] (Optional) Test `GET /api/health` endpoint manually via curl/Postman
-
-*(Next: Days 2-3 ingestion pipeline once connectivity confirmed.)*
+- [ ] Not yet confirmed by an actual `./mvnw spring-boot:run` + log check — Days 2-4 work
+      proceeded on the assumption this works; if it doesn't, that's the first thing to debug.
+      Note the 2026-07-30 Gemini `outputDimensionality` bug fix means this health check's
+      actual behavior changed since it was last (not) verified.
 
 ### Phase 0 — Scaffolding (completed 2026-07-23)
 - [x] Explored environment, confirmed toolchain (Java 25, no Maven binary, Node 22, git configured)
