@@ -8,17 +8,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class WebClientConfig {
 
     @Bean
-    public WebClient geminiWebClient(GeminiProperties geminiProperties) {
-        return WebClient.builder()
-                .baseUrl(geminiProperties.baseUrl())
-                .build();
-    }
-
-    @Bean
-    public WebClient pineconeWebClient(PineconeProperties pineconeProperties) {
-        return WebClient.builder()
-                .baseUrl("https://" + pineconeProperties.indexHost())
-                .defaultHeader("Api-Key", pineconeProperties.apiKey())
-                .build();
+    public WebClient webClient() {
+        return WebClient.builder().build();
     }
 }

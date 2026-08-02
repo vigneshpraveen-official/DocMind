@@ -1,0 +1,118 @@
+Northwind Analytics — Employee Handbook
+
+SECTION 1: LEAVE POLICY
+
+1.1 Paid Time Off (Full-Time Employees)
+Full-time employees accrue 18 days of paid time off (PTO) per calendar year, accrued monthly at
+a rate of 1.5 days per month. Unused PTO may be carried over into the following year up to a
+maximum of 10 days. Any balance beyond 10 days is forfeited on December 31st unless local law
+requires otherwise.
+
+1.2 Leave Policy for Interns
+Interns are not eligible for standard PTO. Instead, interns accrue 1 day of paid leave for every
+full month of their internship, up to a maximum of 6 days for a standard 6-month internship.
+Intern leave does not carry over between internship terms and does not carry over if the intern
+converts to a full-time role; full-time PTO accrual begins fresh on the employee's full-time
+start date.
+
+1.3 Sick Leave
+All employees, including interns, receive 8 paid sick days per year. Sick leave does not carry
+over year to year. A doctor's note is required for sick leave lasting more than 3 consecutive
+days.
+
+1.4 Parental Leave
+Full-time employees with at least 12 months of tenure are eligible for 16 weeks of paid parental
+leave following the birth, adoption, or fostering of a child. Interns and employees with less
+than 12 months of tenure are not eligible for paid parental leave but may request unpaid leave
+of up to 8 weeks, subject to manager approval.
+
+SECTION 2: REMOTE WORK POLICY
+
+2.1 Eligibility
+Employees who have completed their 90-day probationary period are eligible to work remotely up
+to 3 days per week. Interns are not eligible for remote work and are required to work on-site
+for the full duration of their internship, except in cases of documented illness.
+
+2.2 Equipment
+The company provides a laptop, monitor, and a one-time $300 home office stipend to employees
+approved for regular remote work. Interns are provided a laptop only; the home office stipend
+does not apply to interns.
+
+2.3 Core Hours
+All employees, remote or on-site, are expected to be available between 10:00 AM and 4:00 PM in
+their local time zone, Monday through Friday, excluding company holidays.
+
+SECTION 3: EXPENSE REIMBURSEMENT
+
+3.1 General Policy
+Employees may submit expense reports for business-related travel, client meals, and approved
+software subscriptions. All expense reports must be submitted within 30 days of the expense
+being incurred, along with an itemized receipt. Reports submitted after 30 days will not be
+reimbursed except in exceptional circumstances approved by a director.
+
+3.2 Travel Expenses
+Domestic flights must be booked in economy class unless the flight duration exceeds 6 hours, in
+which case premium economy is permitted. Hotel accommodations are capped at $220 per night in
+major metro areas and $150 per night elsewhere.
+
+3.3 Meals
+Meal reimbursement while traveling is capped at $75 per day, itemized. Alcohol is not
+reimbursable under any circumstances.
+
+SECTION 4: CODE OF CONDUCT
+
+4.1 Workplace Behavior
+All employees are expected to treat colleagues, clients, and partners with respect. Harassment,
+discrimination, or retaliation of any kind will not be tolerated and may result in immediate
+termination, regardless of the employee's tenure or role.
+
+4.2 Conflicts of Interest
+Employees must disclose any outside employment, board membership, or financial interest that
+could reasonably be seen as conflicting with Northwind Analytics' business. Disclosures should
+be made to the employee's manager and to HR within 2 weeks of the conflict arising.
+
+4.3 Confidentiality
+Employees, including interns, must sign a confidentiality agreement before their first day. This
+agreement remains in effect for 2 years following the end of employment, covering client data,
+trade secrets, and unreleased product plans.
+
+SECTION 5: PERFORMANCE REVIEWS
+
+5.1 Review Cycle
+Full-time employees receive formal performance reviews twice a year: a mid-year check-in in June
+and an annual review in December. New hires receive an additional 90-day review with their
+manager.
+
+5.2 Intern Reviews
+Interns receive a single formal review at the midpoint of their internship and a final review in
+the last week of their term. The final review includes a recommendation on whether the intern
+will be extended an offer for full-time employment.
+
+5.3 Promotion Cycles
+Promotions are considered during the December annual review cycle only. Off-cycle promotions
+require director-level approval and are reserved for exceptional circumstances, such as
+retention risk or a significant scope change.
+
+SECTION 6: IT AND SECURITY POLICY
+
+6.1 Device Security
+All company-issued laptops must have full-disk encryption and the company-managed antivirus
+agent installed before being used to access internal systems. Personal devices may not be used
+to access internal systems except through the approved mobile email client.
+
+6.2 Password Requirements
+Passwords for internal systems must be at least 14 characters, rotated every 180 days, and must
+not be reused across the last 10 passwords. Multi-factor authentication is mandatory for all
+employees and interns accessing company systems remotely.
+
+6.3 Data Classification
+Company data is classified as Public, Internal, Confidential, or Restricted. Restricted data
+(such as customer payment information) may only be accessed by employees who have completed the
+annual Restricted Data Handling certification.
+
+SECTION 7: COMPANY HOLIDAYS
+
+Northwind Analytics observes 11 paid holidays per year in the United States: New Year's Day,
+Martin Luther King Jr. Day, Presidents' Day, Memorial Day, Juneteenth, Independence Day, Labor
+Day, Thanksgiving Day, the day after Thanksgiving, Christmas Eve, and Christmas Day. Employees in
+other countries follow the locally published holiday calendar for their office.

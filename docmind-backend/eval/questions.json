@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "question": "What is the leave policy for interns?",
+    "answerable": true,
+    "expectedAnswer": "Interns accrue 1 paid leave day per full month, up to 6 days for a 6-month internship; no carryover between terms or into a full-time role."
+  },
+  {
+    "id": 2,
+    "question": "How many PTO days do full-time employees accrue per year?",
+    "answerable": true,
+    "expectedAnswer": "18 days per year, accrued at 1.5 days/month, up to 10 days may carry over."
+  },
+  {
+    "id": 3,
+    "question": "How many paid sick days do employees get per year?",
+    "answerable": true,
+    "expectedAnswer": "8 paid sick days per year, does not carry over; doctor's note required beyond 3 consecutive days."
+  },
+  {
+    "id": 4,
+    "question": "Are interns eligible to work remotely?",
+    "answerable": true,
+    "expectedAnswer": "No, interns must work on-site for the full internship except in cases of documented illness."
+  },
+  {
+    "id": 5,
+    "question": "What is the home office stipend for employees approved for remote work?",
+    "answerable": true,
+    "expectedAnswer": "A one-time $300 stipend; does not apply to interns."
+  },
+  {
+    "id": 6,
+    "question": "How many days per week can an eligible employee work remotely, and when do they become eligible?",
+    "answerable": true,
+    "expectedAnswer": "Up to 3 days per week, after completing the 90-day probationary period."
+  },
+  {
+    "id": 7,
+    "question": "What are the required core working hours?",
+    "answerable": true,
+    "expectedAnswer": "10:00 AM to 4:00 PM in the employee's local time zone, Monday through Friday, excluding company holidays."
+  },
+  {
+    "id": 8,
+    "question": "Within how many days must an expense report be submitted?",
+    "answerable": true,
+    "expectedAnswer": "Within 30 days of the expense being incurred, with an itemized receipt."
+  },
+  {
+    "id": 9,
+    "question": "What is the daily meal reimbursement cap while traveling for business?",
+    "answerable": true,
+    "expectedAnswer": "$75 per day, itemized."
+  },
+  {
+    "id": 10,
+    "question": "Is alcohol reimbursable as a business expense?",
+    "answerable": true,
+    "expectedAnswer": "No, alcohol is not reimbursable under any circumstances."
+  },
+  {
+    "id": 11,
+    "question": "What is the hotel cost cap for business travel?",
+    "answerable": true,
+    "expectedAnswer": "$220 per night in major metro areas, $150 per night elsewhere."
+  },
+  {
+    "id": 12,
+    "question": "How long does the confidentiality agreement remain in effect after an employee leaves the company?",
+    "answerable": true,
+    "expectedAnswer": "2 years following the end of employment."
+  },
+  {
+    "id": 13,
+    "question": "When do full-time employees receive performance reviews?",
+    "answerable": true,
+    "expectedAnswer": "Twice a year: a mid-year check-in in June and an annual review in December; new hires also get a 90-day review."
+  },
+  {
+    "id": 14,
+    "question": "How are interns reviewed during their internship?",
+    "answerable": true,
+    "expectedAnswer": "One review at the midpoint and a final review in the last week, which includes a recommendation on a full-time offer."
+  },
+  {
+    "id": 15,
+    "question": "What are the password requirements for internal systems?",
+    "answerable": true,
+    "expectedAnswer": "At least 14 characters, rotated every 180 days, no reuse of the last 10 passwords; MFA is mandatory for remote access."
+  },
+  {
+    "id": 16,
+    "question": "How many paid holidays does the company observe in the United States?",
+    "answerable": true,
+    "expectedAnswer": "11 paid holidays."
+  },
+  {
+    "id": 17,
+    "question": "Can an employee with 8 months of tenure take paid parental leave?",
+    "answerable": true,
+    "expectedAnswer": "No, paid parental leave requires at least 12 months of tenure; they could request unpaid leave up to 8 weeks instead."
+  },
+  {
+    "id": 18,
+    "question": "What is Northwind Analytics' annual revenue?",
+    "answerable": false,
+    "expectedAnswer": "Not in the document — financial/revenue figures are not covered by the employee handbook."
+  },
+  {
+    "id": 19,
+    "question": "Who is the current Head of HR at Northwind Analytics?",
+    "answerable": false,
+    "expectedAnswer": "Not in the document — no individual names or org chart are included."
+  },
+  {
+    "id": 20,
+    "question": "What is the company's parental leave policy for same-sex couples specifically?",
+    "answerable": false,
+    "expectedAnswer": "Not in the document — the parental leave section does not distinguish by family structure, only by tenure and employment type."
+  }
+]

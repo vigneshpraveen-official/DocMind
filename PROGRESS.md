@@ -23,13 +23,39 @@
 
 ## Current Phase
 
-**Phase 1 — Day 4 Query + Grounded Generation (in progress).** Baseline RAG query flow is live:
-`POST /api/chat/query` embeds the question (`RETRIEVAL_QUERY` task type), searches Pinecone for
-the top-5 most similar chunks, builds a grounded prompt from the master doc's system instruction,
-calls Gemini generation (`gemini-2.5-flash`, temperature 0.2), and returns `{ answer, sources }`.
-No MCP yet (Days 6-7) and no session/message persistence yet (Day 8, per the master doc's
-timeline — this endpoint is intentionally stateless for now, see Decisions Log). Compiles
-cleanly. Not yet manually tested with a real question against real indexed data.
+**Phase 1 — Day 5 Eval Set (complete).** Big milestone this session: the app was actually run
+live for the first time (Days 1-4 had only ever been compile-checked, never booted) —
+`./mvnw spring-boot:run` against the real Neon/Gemini/Pinecone credentials in `.env`. This
+surfaced and fixed **six real bugs** that had been sitting undetected since nobody had run the
+app before (full details in Decisions Log, all dated 2026-08-02):
+1. `.env`'s `DB_URL` embedded `user:password@` in JDBC-URL style, which the Postgres JDBC driver
+   rejects (that's libpq/psql connection-string syntax, not JDBC)
+2. Two ambiguous `WebClient` beans caused a startup `NoUniqueBeanDefinitionException` — collapsed
+   to one, since neither bean's `baseUrl`/default-header config was ever actually used by any
+   caller (every service builds absolute URLs and sets its own auth header)
+3. `PineconeService` sent `Authorization: Bearer <key>`; Pinecone's REST API actually wants
+   `Api-Key: <key>` (the master doc's own sample code had this right — Day 1's implementation
+   deviated from it without noticing)
+4. `PineconeQueryResponse.usage` was typed `long` but Pinecone returns `{"readUnits": N}`, an
+   object — field was unused anywhere in the codebase, so removed rather than modeled
+5. `gemini-2.5-flash` (originally configured generation model) returns 404 "no longer available
+   to new users" for this project's API key — switched to `gemini-3.5-flash`
+6. `gemini-3.5-flash`'s free-tier daily quota (`limit: 20` generateContent requests/day) was
+   exhausted partway through the eval run — switched to `gemini-3.5-flash-lite`, which has a
+   separate, more generous free-tier quota and produced equally good answers in practice
+
+With those fixed, `GET /api/health` reports all three connections healthy, and the full
+ingest → embed → upsert → query → grounded-answer pipeline was verified working live end to end
+against a real test document (`eval/sample-hr-policy.pdf`, a fabricated Northwind Analytics
+employee handbook built specifically for this eval).
+
+**Real eval results (20 questions, naive vs. grounded prompt, full writeup in
+`eval/results.md`):** zero factual hallucinations occurred in *either* prompt variant — a
+genuinely positive sign the retrieval pipeline is solid. The grounding instruction's clearly
+measured win was **source citation: 52.9% (naive) → 100% (grounded)**, a +47 percentage point
+improvement in answers that name a specific, checkable section/page. That citation-rate number,
+not a fabricated "hallucination reduced by X%" claim, is the honest, defensible resume metric
+from this project — see `eval/results.md` for the full scoring table and reasoning.
 
 ---
 
@@ -60,6 +86,13 @@ cleanly. Not yet manually tested with a real question against real indexed data.
 | 2026-07-31 | Grounded prompt uses the master doc's system instruction (Section 6) verbatim, with one addition: each context chunk is labeled `[Source: {filename}, page {N}]` above its text | The master doc's instruction says "cite which section supports your answer" but the raw context chunks it shows have no labels to cite by. Adding the label lets Gemini's citation actually reference something concrete, and gives us a prompt worth using as Day 5's "refined" baseline (vs. a naive unlabeled/no-instruction prompt) rather than needing to invent one from scratch then. |
 | 2026-07-31 | Generation temperature set to 0.2 (low, not default ~1.0) | Grounded factual Q&A benefits from low temperature — less creative rephrasing, less chance of drifting from the provided context. Not in the master doc's snippet, but directly serves the project's core "reduce hallucination" goal, so worth setting deliberately now rather than leaving at the API default. |
 | 2026-07-31 | If Pinecone returns zero matches (empty index), skip the Gemini generation call entirely and return a canned "I don't have information on that" response | No context means there's nothing for Gemini to ground an answer in — calling it anyway would just burn an API call for a foregone conclusion. If Pinecone returns matches but they're weakly relevant, they're still passed through to Gemini rather than filtered by a score threshold — deciding "is this actually relevant" is left to the grounding instruction itself, which is exactly what Day 5's eval set is designed to test. |
+| 2026-08-02 | **Bug fix:** `.env`'s `DB_URL` changed from `jdbc:postgresql://neondb_owner:PASSWORD@host/db?...` to `jdbc:postgresql://host/db?...` (credentials removed from the URL) | The Postgres JDBC driver rejects `user:password@` embedded in the URL authority — that's psql/libpq connection-string syntax, not JDBC. `application.yml` already sets `spring.datasource.username`/`password` separately from `DB_USERNAME`/`DB_PASSWORD`, so the URL never needed the credentials at all. This was the very first thing that broke on the first-ever live run; Days 1-4 had been built and "verified" purely by `mvn compile` until this session. |
+| 2026-08-02 | **Bug fix:** collapsed `WebClientConfig`'s two `WebClient` beans (`geminiWebClient`, `pineconeWebClient`) into one plain `webClient()` bean | Caused a startup `NoUniqueBeanDefinitionException` the moment any service tried to autowire a bare `WebClient` (no `@Qualifier` anywhere). Root cause wasn't just ambiguity — the two beans' `baseUrl`/default-header setup was dead configuration: every real call site (`GeminiEmbeddingService`, `GeminiGenerationService`, `PineconeService`) builds a fully-qualified absolute URL and sets its own auth header per-request, and passing an absolute URL to `WebClient.uri()` ignores any configured base URL anyway. Removing the two specialized beans wasn't a workaround, it was deleting code that never did anything. |
+| 2026-08-02 | **Bug fix:** `PineconeService` now sends header `Api-Key: <key>`, not `Authorization: Bearer <key>` | Pinecone's REST API wants `Api-Key`, confirmed via direct `curl` (200 with `Api-Key`, 401 with `Bearer`). The master doc's own Section 6 sample code had this right (`.header("Api-Key", pineconeApiKey)`); Day 1's implementation silently deviated from it without anyone noticing, since the app had never been run. |
+| 2026-08-02 | **Bug fix:** removed `PineconeQueryResponse.usage` field entirely (was typed `long`) | Pinecone actually returns `"usage": {"readUnits": N}` — an object, not a number — which broke Jackson deserialization on every query call. The field wasn't read anywhere in the codebase, so removed rather than modeled as a nested `Usage` class. |
+| 2026-08-02 | Generation model changed twice more: `gemini-2.5-flash` → `gemini-3.5-flash` → `gemini-3.5-flash-lite` | `gemini-2.5-flash` returns 404 "no longer available to new users" for this project's API key (confirmed via direct `curl` against the real `v1beta/models` list — it's still a listed model, just not usable by this key). Switched to `gemini-3.5-flash`, which worked — until its free-tier quota (`limit: 20` generateContent requests/day, confirmed from the actual 429 error body) was exhausted mid-eval. Switched again to `gemini-3.5-flash-lite`, which has a separate quota bucket (confirmed via `curl` before switching) and produced equally accurate answers in the Day 5 eval. Both switches are one-line config changes (`docmind.gemini.generation-model` in `application.yml`) — exactly why that value was externalized instead of hardcoded. Whoever revisits this project later should expect to repeat this dance; Gemini's free-tier model lineup and quotas change often. |
+| 2026-08-02 | Built `EvalRunner` (`com.docmind.eval`, `@Profile("eval")`) as a resumable `CommandLineRunner`, not a REST endpoint | Day 5 needs to run every eval question through both a naive and a grounded prompt using the *same* retrieved context (to isolate the prompt's effect from retrieval variance) and dump results for scoring. A permanent `/api/eval/run` endpoint would be unnecessary production surface for a one-off dev task, so it's profile-gated (`-Dspring-boot.run.profiles=eval`) and exits via `SpringApplication.exit()` when done. Made it resumable (skips question IDs already present in `eval/results-raw.json`) after the first run got cut off by a rate limit partway through — re-running from scratch would have wasted already-consumed quota for no reason. Retry logic backs off on `RESOURCE_EXHAUSTED`/429 specifically and re-raises anything else immediately. |
+| 2026-08-02 | Day 5's real finding is a citation-rate metric (52.9% → 100%), not a hallucination-rate metric, because hallucination rate was 0% in both prompt conditions | Manually scored all 40 answers (20 questions × naive + grounded) against the source document — zero fabricated facts in either condition, on both the 17 answerable and 3 deliberately-unanswerable questions. Reporting a hallucination-rate improvement would have meant inventing a number that isn't in the data. What *did* measurably differ: the grounding instruction's "cite which section supports your answer" pushed citation rate from 9/17 to 17/17. Full reasoning and the per-question scoring table are in `eval/results.md` — kept the writeup honest about the nuance (strong retrieval + strong model meant naive prompting also avoided hallucinating on this particular sample) rather than forcing a bigger-sounding but fabricated claim. |
 
 ---
 
@@ -71,11 +104,11 @@ has been provided and is sitting in the local (gitignored) `.env`.
 
 | Credential | Status | Notes |
 |---|---|---|
-| Gemini API key | User confirmed they have it | Not yet collected into `.env` |
-| Pinecone API key + index host | User confirmed they have it | Not yet collected into `.env`; index must be created with dimension matching `gemini-embedding-001` output (768, per our config choice) |
-| Neon Postgres connection string | User confirmed they have it | Not yet collected into `.env` |
-| JWT secret | Not yet generated | Will be generated locally (random 256-bit value), not requested from user |
-| GitHub push access | Verified working | SSH key already authenticated as `vigneshpraveen-official`, confirmed via `ssh -T git@github.com`. Remote `origin` set to `git@github.com:vigneshpraveen-official/DocMind.git`. Repo is currently empty on GitHub (no refs). |
+| Gemini API key | **Confirmed working** (2026-08-02) | In `.env`, verified live via `GET /api/health` and the Day 5 eval (dozens of real embed/generate calls) |
+| Pinecone API key + index host | **Confirmed working** (2026-08-02) | In `.env`, verified live — upsert and query both confirmed against the real `docmind` index (dimension 768) |
+| Neon Postgres connection string | **Confirmed working** (2026-08-02) | In `.env`; `DB_URL` had to be corrected (credentials were embedded in the URL, which the JDBC driver rejects — see Decisions Log). Flyway migration applies cleanly against it. |
+| JWT secret | Generated, sitting in `.env` | Not yet used — auth isn't built until Day 8 |
+| GitHub push access | Verified working | SSH key authenticated as `vigneshpraveen-official`. Remote `origin`: `git@github.com:vigneshpraveen-official/DocMind.git`. Days 1-4 commits already pushed. |
 
 ---
 
@@ -103,9 +136,38 @@ None blocking right now. Resolved items moved to Decisions Log above.
 
 ## Phase Log
 
-### Phase 1 — Day 4 Query + Grounded Generation (in progress, started 2026-07-31)
+### Phase 1 — Day 5 Eval Set (completed 2026-08-02)
+- [x] First-ever live run of the app (`./mvnw spring-boot:run` against real Neon/Gemini/Pinecone
+      credentials) — found and fixed 6 real bugs, see Decisions Log entries dated 2026-08-02
+- [x] `GET /api/health` confirmed all-green (`postgres: true, gemini: true, pinecone: true`)
+- [x] Built `eval/sample-hr-policy.pdf` — a fabricated 3-page employee handbook (Northwind
+      Analytics), generated from `eval/sample-hr-policy.txt` via `soffice --headless --convert-to pdf`
+- [x] Uploaded and confirmed `PROCESSED` (3 chunks, all correctly extracted/embedded/indexed)
+- [x] Manually verified Day 4's `/api/chat/query` end-to-end with real questions (accurate,
+      correctly-sourced answer for an answerable question; correct decline for an unanswerable one)
+- [x] `eval/questions.json` — 20 questions (17 answerable, 3 deliberately not covered)
+- [x] `PromptBuilder.buildNaivePrompt()` added alongside the existing grounded one
+- [x] `EvalRunner` (`com.docmind.eval`, `@Profile("eval")`) — resumable eval harness, retries
+      with backoff on rate limits, writes `eval/results-raw.json`
+- [x] Ran the eval live against real Gemini/Pinecone APIs (all 40 answers are real model output,
+      not hand-written) — took 3 attempts across two generation models due to free-tier quota
+      limits, see Decisions Log
+- [x] Manually scored all 40 answers against the source document; wrote up methodology, full
+      per-question scoring table, and honest findings in `eval/results.md`
+- [x] All code compiles cleanly (`./mvnw compile`)
+- [ ] Commit + push Day 5 code (in progress)
+
+**Result:** 0% hallucination rate in both naive and grounded conditions (retrieval pipeline is
+solid); grounding instruction raised verifiable source citation from 52.9% to 100% — the real,
+defensible resume number from this project. Full detail in `eval/results.md`.
+
+*(Next: Day 6-7 — research MCP Java tooling, build the MCP tool server (`search_documents` tool),
+wire it into the orchestrator.)*
+
+### Phase 1 — Day 4 Query + Grounded Generation (completed 2026-07-31)
 - [x] New DTOs: `GeminiGenerateRequest`/`Response`, `ChatQueryRequest`/`Response`, `SourceReference`
-- [x] `GeminiGenerationService.generate(prompt)` — calls `generateContent` on `gemini-2.5-flash`,
+- [x] `GeminiGenerationService.generate(prompt)` — calls `generateContent` on the configured
+      generation model (`gemini-2.5-flash` originally; see Day 5 for why that changed twice),
       temperature 0.2
 - [x] `RetrievedChunk` record + `PromptBuilder.buildGroundedPrompt(question, chunks)` — master
       doc's grounding instruction verbatim, plus `[Source: filename, page N]` labels per chunk
@@ -115,12 +177,9 @@ None blocking right now. Resolved items moved to Decisions Log above.
       builds the prompt, calls generation, and returns deduped `sources`
 - [x] `ChatController` — `POST /api/chat/query`, `@Valid`-checked `{ question }` body
 - [x] All new code compiles cleanly (`./mvnw compile`)
-- [ ] Manual end-to-end test: ask a real question against a document ingested in Day 2/3, confirm
-      `answer` is grounded and `sources` point at the right document/page (awaiting user run)
-- [ ] Commit + push Day 4 code
-
-*(Next: Day 5 — build a 15-20 question eval set, run it once with a naive prompt and once with
-this refined one, record the real hallucination-reduction % for the resume.)*
+- [x] Committed and pushed to `origin/main`
+- [x] Manual end-to-end test: confirmed working live during Day 5 (see above) — accurate, sourced
+      answers for answerable questions, correct declines for unanswerable ones
 
 ### Phase 1 — Day 3 Embedding + Vector Indexing (completed 2026-07-30)
 - [x] **Bug fix:** `GeminiEmbedRequest` now includes `taskType` + `outputDimensionality`
@@ -161,7 +220,7 @@ this refined one, record the real hallucination-reduction % for the resume.)*
       `GET /api/documents/{id}/chunks` — still not confirmed by an actual run; Day 3 built on
       top of this anyway (chunking logic didn't change, low risk)
 
-### Phase 1 — Day 1 Connection Verification (code complete 2026-07-23, runtime unconfirmed)
+### Phase 1 — Day 1 Connection Verification (completed 2026-07-23, runtime confirmed 2026-08-02)
 - [x] Created GeminiEmbeddingService (calls Gemini embedding API via WebClient)
 - [x] Created PineconeService (queries Pinecone via REST API)
 - [x] Created health check methods on both services
@@ -169,10 +228,9 @@ this refined one, record the real hallucination-reduction % for the resume.)*
 - [x] Created HealthController (`GET /api/health`) for manual connection verification via HTTP
 - [x] All new code compiles cleanly
 - [x] Committed and pushed to `origin/main`
-- [ ] Not yet confirmed by an actual `./mvnw spring-boot:run` + log check — Days 2-4 work
-      proceeded on the assumption this works; if it doesn't, that's the first thing to debug.
-      Note the 2026-07-30 Gemini `outputDimensionality` bug fix means this health check's
-      actual behavior changed since it was last (not) verified.
+- [x] Runtime finally confirmed during Day 5's session — took 4 bug fixes (`DB_URL` format,
+      duplicate `WebClient` beans, Pinecone auth header, `PineconeQueryResponse.usage` type) before
+      `GET /api/health` actually returned all-green. See Decisions Log, 2026-08-02.
 
 ### Phase 0 — Scaffolding (completed 2026-07-23)
 - [x] Explored environment, confirmed toolchain (Java 25, no Maven binary, Node 22, git configured)

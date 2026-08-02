@@ -12,7 +12,6 @@ import java.util.Map;
 public class PineconeQueryResponse {
     private List<Match> matches;
     private String namespace;
-    private long usage;
 
     @Data
     @NoArgsConstructor

@@ -11,16 +11,24 @@ For build progress and internal decisions, see [PROGRESS.md](PROGRESS.md).
 
 ## Current status
 
-**Baseline RAG works end to end (through Day 4).** Upload a PDF (Day 2-3: extracted, chunked,
-embedded, upserted to Pinecone), then ask a question about it (Day 4: your question gets
-embedded, matched against Pinecone, and answered by Gemini using only the retrieved chunks as
-context, with sources cited). No MCP tool-calling yet (Days 6-7), no chat history / sessions yet
-(Day 8 — right now `/api/chat/query` is stateless, nothing is saved to Postgres per-question).
+**Baseline RAG is built, live-tested, and measured (through Day 5).** Upload a PDF (Day 2-3:
+extracted, chunked, embedded, upserted to Pinecone), then ask a question about it (Day 4: your
+question gets embedded, matched against Pinecone, and answered by Gemini using only the retrieved
+chunks as context, with sources cited). No MCP tool-calling yet (Days 6-7), no chat history /
+sessions yet (Day 8 — right now `/api/chat/query` is stateless, nothing is saved to Postgres
+per-question).
 
-Along the way (Day 3) I found and fixed a real bug: the Gemini embed request wasn't specifying
-an output dimension, so it would have silently returned 3072-dim vectors instead of the 768 our
-Pinecone index expects. If you tried the Day 1 health check before now and Gemini showed
-unhealthy, that was probably why — worth re-checking `GET /api/health` now that it's fixed.
+**This session the app was actually run live for the first time** (Days 1-4 had only ever been
+compile-checked). That surfaced 6 real bugs — a malformed DB URL, a Spring bean conflict, the
+wrong Pinecone auth header, a bad response type, and two rounds of Gemini model swaps after
+hitting availability/quota walls. All fixed; full detail in `PROGRESS.md`'s Decisions Log if
+you're curious what broke and why. `GET /api/health` now genuinely returns all green.
+
+**Day 5's real eval result:** ran 20 questions against a real indexed test document, once with a
+naive prompt and once with the grounded one, scored all 40 live-generated answers by hand. Zero
+hallucinations in either condition (good sign for retrieval quality) — the grounding instruction's
+clear, measured win was **source citation: 52.9% → 100%**. Full writeup, methodology, and
+per-question scoring table in `docmind-backend/eval/results.md`.
 
 ---
 
@@ -140,10 +148,31 @@ Things worth trying to get a feel for how grounded it actually is:
 - Ask something the document clearly answers — check the answer is accurate and `sources` points
   at the right page.
 - Ask something totally unrelated to your uploaded documents — it should say it doesn't have
-  that information, not make something up. This is the actual behavior Day 5 will measure and
-  put a real number on.
+  that information, not make something up.
 - If no documents are indexed yet at all, it short-circuits to a canned "nothing indexed" answer
   without calling Gemini — that's intentional, not a bug.
+
+This exact behavior is what Day 5's eval measured for real — see `docmind-backend/eval/results.md`
+for the full 20-question scoring writeup.
+
+---
+
+## Day 5 eval set — reproducing or extending it
+
+```bash
+cd docmind-backend
+./mvnw spring-boot:run -Dspring-boot.run.profiles=eval
+```
+
+This runs `eval/questions.json` through both a naive and a grounded prompt (reusing the same
+Pinecone retrieval for both, so it's an apples-to-apples comparison) and writes
+`eval/results-raw.json`. It's resumable — if it gets interrupted (e.g. a free-tier rate limit),
+just run the same command again and it picks up where it left off, skipping question IDs already
+in the results file. Needs a document already indexed first (see above) — the eval set assumes
+`eval/sample-hr-policy.pdf` is what's loaded.
+
+Scoring the results (correct / hallucinated / correctly-declined / cited) is manual — read
+`eval/results-raw.json` against `eval/questions.json`'s `expectedAnswer` field and the source PDF.
 
 ---
 

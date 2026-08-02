@@ -1,0 +1,141 @@
+[ {
+  "id" : 1,
+  "question" : "What is the leave policy for interns?",
+  "answerable" : true,
+  "expectedAnswer" : "Interns accrue 1 paid leave day per full month, up to 6 days for a 6-month internship; no carryover between terms or into a full-time role.",
+  "naiveAnswer" : "Based on the Northwind Analytics Employee Handbook, the leave policy for interns is as follows:\n\n*   **Paid Leave:** Interns are not eligible for standard PTO. Instead, they accrue **1 day of paid leave for every full month** of their internship, up to a maximum of **6 days** for a standard 6-month internship. This leave does not carry over between internship terms, nor does it carry over if the intern transitions to a full-time role.\n*   **Sick Leave:** Interns receive **8 paid sick days per year**. This sick leave does not carry over from year to year, and a doctor's note is required if sick leave lasts for more than 3 consecutive days.\n*   **Parental Leave:** Interns are not eligible for paid parental leave. However, they may request up to **8 weeks of unpaid leave**, subject to manager approval.",
+  "groundedAnswer" : "Based on the provided context, the leave policy for interns consists of the following:\n\n*   **Paid Leave:** Interns are not eligible for standard PTO. Instead, they accrue 1 day of paid leave for every full month of their internship, up to a maximum of 6 days for a standard 6-month internship. This leave does not carry over between internship terms, nor does it carry over if the intern converts to a full-time role (Section 1.2).\n*   **Sick Leave:** Interns receive 8 paid sick days per year. This sick leave does not carry over from year to year, and a doctor's note is required for sick leave lasting more than 3 consecutive days (Section 1.3).\n*   **Parental Leave:** Interns are not eligible for paid parental leave, but they may request up to 8 weeks of unpaid leave, subject to manager approval (Section 1.4).\n\n**Supporting Source:** [Source: sample-hr-policy.pdf, page 1, SECTIONS 1.2, 1.3, and 1.4]"
+}, {
+  "id" : 2,
+  "question" : "How many PTO days do full-time employees accrue per year?",
+  "answerable" : true,
+  "expectedAnswer" : "18 days per year, accrued at 1.5 days/month, up to 10 days may carry over.",
+  "naiveAnswer" : "Based on the employee handbook, full-time employees accrue **18 days** of paid time off (PTO) per calendar year (accrued at a rate of 1.5 days per month).",
+  "groundedAnswer" : "Full-time employees accrue 18 days of paid time off (PTO) per calendar year. \n\nThis is supported by **SECTION 1: LEAVE POLICY, 1.1 Paid Time Off (Full-Time Employees)** on page 1."
+}, {
+  "id" : 3,
+  "question" : "How many paid sick days do employees get per year?",
+  "answerable" : true,
+  "expectedAnswer" : "8 paid sick days per year, does not carry over; doctor's note required beyond 3 consecutive days.",
+  "naiveAnswer" : "Based on the handbook, all employees (including interns) receive **8 paid sick days** per year.",
+  "groundedAnswer" : "All employees, including interns, receive 8 paid sick days per year. \n\nThis is supported by **SECTION 1: LEAVE POLICY (1.3 Sick Leave)** on page 1 of the sample-hr-policy.pdf."
+}, {
+  "id" : 4,
+  "question" : "Are interns eligible to work remotely?",
+  "answerable" : true,
+  "expectedAnswer" : "No, interns must work on-site for the full internship except in cases of documented illness.",
+  "naiveAnswer" : "Based on the employee handbook (Section 2.1), **no, interns are not eligible for remote work**. They are required to work on-site for the full duration of their internship, except in cases of documented illness.",
+  "groundedAnswer" : "No, interns are not eligible for remote work. They are required to work on-site for the full duration of their internship, except in cases of documented illness. \n\nThis is supported by **SECTION 2: REMOTE WORK POLICY, 2.1 Eligibility** (on page 1)."
+}, {
+  "id" : 5,
+  "question" : "What is the home office stipend for employees approved for remote work?",
+  "answerable" : true,
+  "expectedAnswer" : "A one-time $300 stipend; does not apply to interns.",
+  "naiveAnswer" : "Based on the employee handbook, employees approved for regular remote work receive a one-time **$300** home office stipend.",
+  "groundedAnswer" : "Based on the provided context, employees approved for regular remote work receive a one-time **$300** home office stipend. \n\nThis is supported by **SECTION 2: REMOTE WORK POLICY, subsection 2.2 Equipment** (on page 1)."
+}, {
+  "id" : 6,
+  "question" : "How many days per week can an eligible employee work remotely, and when do they become eligible?",
+  "answerable" : true,
+  "expectedAnswer" : "Up to 3 days per week, after completing the 90-day probationary period.",
+  "naiveAnswer" : "Based on the provided handbook, an eligible employee can work remotely **up to 3 days per week**, and they become eligible after completing their **90-day probationary period**.",
+  "groundedAnswer" : "Based on the provided context, an eligible employee can work remotely up to 3 days per week. They become eligible after completing their 90-day probationary period. \n\nThis information is supported by **SECTION 2: REMOTE WORK POLICY, 2.1 Eligibility**."
+}, {
+  "id" : 7,
+  "question" : "What are the required core working hours?",
+  "answerable" : true,
+  "expectedAnswer" : "10:00 AM to 4:00 PM in the employee's local time zone, Monday through Friday, excluding company holidays.",
+  "naiveAnswer" : "Based on the employee handbook, the required core working hours are between **10:00 AM and 4:00 PM** in the employee's local time zone, Monday through Friday (excluding company holidays). All employees, whether remote or on-site, are expected to be available during these hours.",
+  "groundedAnswer" : "Based on the provided context, all employees (whether remote or on-site) are expected to be available between **10:00 AM and 4:00 PM** in their local time zone, Monday through Friday, excluding company holidays.\n\n**Source/Section:** \n[Source: sample-hr-policy.pdf, page 1 & 2] - SECTION 2: REMOTE WORK POLICY, 2.3 Core Hours"
+}, {
+  "id" : 8,
+  "question" : "Within how many days must an expense report be submitted?",
+  "answerable" : true,
+  "expectedAnswer" : "Within 30 days of the expense being incurred, with an itemized receipt.",
+  "naiveAnswer" : "Based on the employee handbook (Section 3.1), an expense report must be submitted within **30 days** of the expense being incurred.",
+  "groundedAnswer" : "Based on the provided context, an expense report must be submitted within 30 days of the expense being incurred. \n\nThis is supported by **SECTION 3: EXPENSE REIMBURSEMENT (specifically Section 3.1 General Policy)** on page 2 of `sample-hr-policy.pdf`."
+}, {
+  "id" : 9,
+  "question" : "What is the daily meal reimbursement cap while traveling for business?",
+  "answerable" : true,
+  "expectedAnswer" : "$75 per day, itemized.",
+  "naiveAnswer" : "Based on the employee handbook (Section 3.3), the daily meal reimbursement cap while traveling for business is **$75 per day** (and must be itemized).",
+  "groundedAnswer" : "Based on the provided context, the daily meal reimbursement cap while traveling is $75 per day, itemized. \n\nThis is supported by **SECTION 3: EXPENSE REIMBURSEMENT (specifically Section 3.3 Meals)** on page 2 of `sample-hr-policy.pdf`."
+}, {
+  "id" : 10,
+  "question" : "Is alcohol reimbursable as a business expense?",
+  "answerable" : true,
+  "expectedAnswer" : "No, alcohol is not reimbursable under any circumstances.",
+  "naiveAnswer" : "Based on the employee handbook (Section 3.3: Meals), **alcohol is not reimbursable under any circumstances**.",
+  "groundedAnswer" : "No, alcohol is not reimbursable under any circumstances. \n\nThis is supported by **SECTION 3: EXPENSE REIMBURSEMENT, Section 3.3 Meals** (Source: sample-hr-policy.pdf, page 2)."
+}, {
+  "id" : 11,
+  "question" : "What is the hotel cost cap for business travel?",
+  "answerable" : true,
+  "expectedAnswer" : "$220 per night in major metro areas, $150 per night elsewhere.",
+  "naiveAnswer" : "Based on the employee handbook, hotel accommodations for business travel are capped at:\n* **$220 per night** in major metro areas\n* **$150 per night** elsewhere",
+  "groundedAnswer" : "Based on the provided context, hotel accommodations are capped at $220 per night in major metro areas and $150 per night elsewhere. \n\nThis is supported by **SECTION 3: EXPENSE REIMBURSEMENT (specifically Section 3.2 Travel Expenses)** on page 2 of `sample-hr-policy.pdf`."
+}, {
+  "id" : 12,
+  "question" : "How long does the confidentiality agreement remain in effect after an employee leaves the company?",
+  "answerable" : true,
+  "expectedAnswer" : "2 years following the end of employment.",
+  "naiveAnswer" : "Based on the provided text (Section 4.3 Confidentiality), the confidentiality agreement remains in effect for **2 years** following the end of employment.",
+  "groundedAnswer" : "The confidentiality agreement remains in effect for 2 years following the end of employment. \n\nSource: [Source: sample-hr-policy.pdf, page 2], Section 4.3 Confidentiality"
+}, {
+  "id" : 13,
+  "question" : "When do full-time employees receive performance reviews?",
+  "answerable" : true,
+  "expectedAnswer" : "Twice a year: a mid-year check-in in June and an annual review in December; new hires also get a 90-day review.",
+  "naiveAnswer" : "Based on Section 5.1 of the employee handbook, full-time employees receive formal performance reviews twice a year: a mid-year check-in in June and an annual review in December. (New hires also receive an additional 90-day review with their manager.)",
+  "groundedAnswer" : "Based on the provided context, full-time employees receive formal performance reviews twice a year: a mid-year check-in in June and an annual review in December. \n\n*(Source: sample-hr-policy.pdf, page 2 - Section 5.1 Review Cycle)*"
+}, {
+  "id" : 14,
+  "question" : "How are interns reviewed during their internship?",
+  "answerable" : true,
+  "expectedAnswer" : "One review at the midpoint and a final review in the last week, which includes a recommendation on a full-time offer.",
+  "naiveAnswer" : "Based on the provided policy (Section 5.2), interns receive **a single formal review at the midpoint of their internship and a final review in the last week of their term**. \n\nThe final review also includes a recommendation on whether the intern will be extended an offer for full-time employment.",
+  "groundedAnswer" : "Based on the provided context, interns receive a single formal review at the midpoint of their internship and a final review in the last week of their term. The final review includes a recommendation on whether the intern will be extended an offer for full-time employment.\n\n**Source:** `sample-hr-policy.pdf`, page 2 and page 3 (Section 5.2 Intern Reviews)"
+}, {
+  "id" : 15,
+  "question" : "What are the password requirements for internal systems?",
+  "answerable" : true,
+  "expectedAnswer" : "At least 14 characters, rotated every 180 days, no reuse of the last 10 passwords; MFA is mandatory for remote access.",
+  "naiveAnswer" : "Based on Section 6.2 (Password Requirements) of the employee handbook, passwords for internal systems must meet the following criteria:\n\n* Must be at least **14 characters** long.\n* Must be **rotated every 180 days**.\n* Must **not be reused** across the last 10 passwords.\n* **Multi-factor authentication** is mandatory for all employees and interns accessing company systems remotely.",
+  "groundedAnswer" : "Based on the provided context, passwords for internal systems must meet the following requirements:\n* Be at least 14 characters long.\n* Be rotated every 180 days.\n* Must not be reused across the last 10 passwords.\n\n*(Source: sample-hr-policy.pdf, page 3, Section 6.2 Password Requirements)*"
+}, {
+  "id" : 16,
+  "question" : "How many paid holidays does the company observe in the United States?",
+  "answerable" : true,
+  "expectedAnswer" : "11 paid holidays.",
+  "naiveAnswer" : "Based on the provided text, Northwind Analytics observes **11 paid holidays** per year in the United States.",
+  "groundedAnswer" : "Based on the provided context, Northwind Analytics observes 11 paid holidays per year in the United States. \n\n**Source:** `sample-hr-policy.pdf, page 3` (SECTION 7: COMPANY HOLIDAYS)"
+}, {
+  "id" : 17,
+  "question" : "Can an employee with 8 months of tenure take paid parental leave?",
+  "answerable" : true,
+  "expectedAnswer" : "No, paid parental leave requires at least 12 months of tenure; they could request unpaid leave up to 8 weeks instead.",
+  "naiveAnswer" : "Based on Section 1.4 of the Employee Handbook, **no**. Full-time employees must have at least 12 months of tenure to be eligible for paid parental leave. Employees with less than 12 months of tenure are not eligible for paid parental leave (though they may request up to 8 weeks of unpaid leave, subject to manager approval).",
+  "groundedAnswer" : "No, employees with less than 12 months of tenure are not eligible for paid parental leave. \n\nSource: SECTION 1: LEAVE POLICY (1.4 Parental Leave)"
+}, {
+  "id" : 18,
+  "question" : "What is Northwind Analytics' annual revenue?",
+  "answerable" : false,
+  "expectedAnswer" : "Not in the document — financial/revenue figures are not covered by the employee handbook.",
+  "naiveAnswer" : "Based on the provided Employee Handbook, there is no mention of Northwind Analytics' annual revenue.",
+  "groundedAnswer" : "I don't have information on that."
+}, {
+  "id" : 19,
+  "question" : "Who is the current Head of HR at Northwind Analytics?",
+  "answerable" : false,
+  "expectedAnswer" : "Not in the document — no individual names or org chart are included.",
+  "naiveAnswer" : "Based on the provided text, there is no mention of who the current Head of HR is at Northwind Analytics. The handbook mentions HR (for example, in the context of disclosing conflicts of interest), but it does not name any specific individuals holding that role.",
+  "groundedAnswer" : "I don't have information on that."
+}, {
+  "id" : 20,
+  "question" : "What is the company's parental leave policy for same-sex couples specifically?",
+  "answerable" : false,
+  "expectedAnswer" : "Not in the document — the parental leave section does not distinguish by family structure, only by tenure and employment type.",
+  "naiveAnswer" : "Based on the provided employee handbook, the parental leave policy applies to the \"birth, adoption, or fostering of a child,\" but the text does not contain any specific mentions, distinctions, or rules regarding same-sex couples. \n\nAccording to Section 1.4:\n* **Full-time employees** with at least 12 months of tenure are eligible for 16 weeks of paid parental leave following the birth, adoption, or fostering of a child.\n* **Interns and employees with less than 12 months of tenure** are not eligible for paid parental leave, but may request unpaid leave of up to 8 weeks, subject to manager approval.",
+  "groundedAnswer" : "I don't have information on that."
+} ]

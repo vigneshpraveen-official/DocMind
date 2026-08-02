@@ -41,7 +41,7 @@ public class PineconeService {
 
         PineconeUpsertResponse response = webClient.post()
             .uri(url)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + pineconeProperties.apiKey())
+            .header("Api-Key", pineconeProperties.apiKey())
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .bodyValue(request)
             .retrieve()
@@ -68,7 +68,7 @@ public class PineconeService {
 
         PineconeQueryResponse response = webClient.post()
             .uri(url)
-            .header(HttpHeaders.AUTHORIZATION, "Bearer " + pineconeProperties.apiKey())
+            .header("Api-Key", pineconeProperties.apiKey())
             .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
             .bodyValue(request)
             .retrieve()

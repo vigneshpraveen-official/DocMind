@@ -26,4 +26,18 @@ public class PromptBuilder {
                 + "\n\nContext:\n" + context
                 + "\n\nQuestion: " + question;
     }
+
+    /**
+     * No grounding instruction — same retrieved context, but nothing telling the model to
+     * stick to it or to admit when it doesn't know. Exists only for the Day 5 eval comparison
+     * against {@link #buildGroundedPrompt}, to isolate the instruction's effect on hallucination.
+     */
+    public String buildNaivePrompt(String question, List<RetrievedChunk> chunks) {
+        StringBuilder context = new StringBuilder();
+        for (RetrievedChunk chunk : chunks) {
+            context.append(chunk.text()).append("\n---\n");
+        }
+
+        return "Context:\n" + context + "\n\nQuestion: " + question;
+    }
 }
