@@ -23,6 +23,19 @@
 
 ## Current Phase
 
+**Phase 1 — Day 6 MCP Tool Server (complete).** Built the `search_documents` MCP tool server using
+the official Java SDK (`io.modelcontextprotocol.sdk`) plus Spring AI's `spring-ai-starter-mcp-server-webmvc`
+starter, both at version `2.0.1` — confirmed compatible with Spring Boot 4.1 by resolving real
+dependencies and running the app, not by trusting web-search summaries (which gave inconsistent,
+sometimes fabricated-looking version numbers and APIs for this SDK — see Decisions Log). The tool
+does structured lookup over `documents` (filename keyword, upload-date, status) — the kind of
+query semantic/Pinecone search can't answer (e.g. "documents uploaded this month") — exactly the
+complementary role the master doc's Section 7 describes. Verified live: `initialize`, `tools/list`,
+and `tools/call` all round-tripped correctly over real HTTP against the running app, including the
+SDK's own JSON-schema validation rejecting a bad `status` enum value before it reached our handler.
+Day 7 (next) wires an MCP *client* into `ChatService` so Gemini's function-calling can actually
+invoke this tool mid-conversation — today only proves the server side works standalone.
+
 **Phase 1 — Day 5 Eval Set (complete).** Big milestone this session: the app was actually run
 live for the first time (Days 1-4 had only ever been compile-checked, never booted) —
 `./mvnw spring-boot:run` against the real Neon/Gemini/Pinecone credentials in `.env`. This
@@ -96,6 +109,10 @@ from this project — see `eval/results.md` for the full scoring table and reaso
 
 ---
 
+| 2026-09-05 | Used `io.modelcontextprotocol.sdk:mcp-bom:2.0.1` + `org.springframework.ai:spring-ai-starter-mcp-server-webmvc:2.0.1` (via `spring-ai-bom`), not the older `io.modelcontextprotocol.sdk:mcp-spring-webmvc` artifact | That older artifact is frozen at `0.18.4` (pre-1.0, last released before the SDK's 1.x/2.x rename) — confirmed by listing actual Maven Central directory contents, since web searches for "MCP Java SDK Maven coordinates" returned plausible-looking but inconsistent/wrong version numbers and code samples (WebFetch summarization of vendor docs, not the docs themselves). Spring AI 2.0.1 repackages the WebMVC transport as `org.springframework.ai:mcp-spring-webmvc:2.0.1` internally, which does line up with the `mcp-core:2.0.0`/`mcp:2.0.0` the BOM pulls in. Verified the whole stack actually works by running the app live, not just compiling — see below. |
+| 2026-09-05 | `spring.ai.mcp.server.protocol: STREAMABLE` set explicitly in `application.yml`, even though `STREAMABLE` is the documented default | Decompiled the actual autoconfiguration class (`McpServerAutoConfiguration$EnabledStreamableServerCondition`) after the endpoint 404'd with no config set: the `@ConditionalOnProperty` gating the streamable-HTTP transport bean has `matchIfMissing=false`, so the Java field's default value never takes effect unless the property is bound from *some* config source. This is a real gotcha in the current SDK version — anyone wiring this up from the docs alone (which don't mention needing to set a "default" value explicitly) will hit the same silent 404. |
+| 2026-09-05 | `search_documents` tool filters `documentRepository.findAll()` in Java (`DocumentSearchService`) rather than adding 6+ derived-query-method overloads to `DocumentRepository` for every combination of optional filters | Considered the derived-query approach first, rejected it as combinatorial-explosion overkill for a single-user portfolio project's document count. Matches this project's existing bias (see 2026-07-30 entry) toward simplicity over premature abstraction at this scale. |
+
 ## Environment / Credentials Status
 
 Tracked here so we don't re-ask the user for things already provided. **Never write actual
@@ -135,6 +152,34 @@ None blocking right now. Resolved items moved to Decisions Log above.
 ---
 
 ## Phase Log
+
+### Phase 1 — Day 6 MCP Tool Server (completed 2026-09-05)
+- [x] Researched actual Maven Central contents for the MCP Java SDK (`io.modelcontextprotocol.sdk`)
+      and Spring AI's MCP server starters directly (directory listing + `maven-metadata.xml`), since
+      web-search-summarized docs gave inconsistent/wrong version numbers and API shapes
+- [x] Added `spring-ai-bom:2.0.1` (dependency management) + `spring-ai-starter-mcp-server-webmvc`
+      to `pom.xml`; resolved cleanly against the existing Spring Boot 4.1.0 + Java 17 setup
+- [x] Decompiled the actual downloaded jars (`javap`) to get the real `McpServerFeatures.SyncToolSpecification`
+      / `McpSchema.Tool` / `CallToolRequest` / `CallToolResult` API rather than trust web-summarized
+      (and, on inspection, subtly wrong) code samples
+- [x] `DocumentSearchService` (`service/mcp/`) — filters `documents` by filename keyword, upload
+      date, and status in Java (see Decisions Log for why not derived JPA queries)
+- [x] `DocumentSearchMcpToolConfig` — registers the `search_documents` MCP tool as a
+      `List<McpServerFeatures.SyncToolSpecification>` bean, with a JSON Schema `inputSchema` and a
+      `callHandler` that parses arguments, calls the search service, and returns JSON text content
+- [x] `application.yml` — `spring.ai.mcp.server` config block (`name`, `version`, `instructions`,
+      and an explicitly-set `protocol: STREAMABLE` — see Decisions Log for why explicit is required)
+- [x] All new code compiles cleanly (`./mvnw compile`), no deprecation warnings
+- [x] Booted the app live and confirmed over real HTTP: `initialize` (200, correct `serverInfo`/
+      `instructions`), `tools/list` (correct schema), `tools/call` for a keyword match, a keyword
+      non-match, a date-range non-match, and an invalid enum value (correctly rejected by the SDK's
+      own JSON-schema validation before reaching our handler) — all against the real Neon-backed
+      `documents` table (the `sample-hr-policy.pdf` row from Day 5's eval)
+- [ ] Not yet done: wiring an MCP *client* into `ChatService` so Gemini's function-calling can
+      actually invoke this tool during a real chat query — that's Day 7
+
+*(Next: Day 7 — wire MCP client into the ChatService orchestrator, test a tool-invoking query
+end-to-end.)*
 
 ### Phase 1 — Day 5 Eval Set (completed 2026-08-02)
 - [x] First-ever live run of the app (`./mvnw spring-boot:run` against real Neon/Gemini/Pinecone
