@@ -9,7 +9,9 @@ public class PromptBuilder {
 
     private static final String SYSTEM_INSTRUCTION = """
             Answer the user's question using ONLY the context below.
-            If the answer is not in the context, say "I don't have information on that."
+            If the context does not contain the answer but a search_documents tool is available,
+            call it to look up the information before giving up.
+            If neither the context nor the tool has the answer, say "I don't have information on that."
             Do not use outside knowledge. Cite which section supports your answer.
             """;
 
