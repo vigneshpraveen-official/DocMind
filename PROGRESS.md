@@ -23,6 +23,20 @@
 
 ## Current Phase
 
+**Phase 1 — Day 7 MCP Client Wiring (complete).** `ChatService` now hands Gemini the MCP tool
+declarations alongside the grounded prompt, so the model can invoke `search_documents` (built
+Day 6) mid-answer for structured questions the retrieved Pinecone chunks can't cover (e.g. "how
+many documents have been uploaded"). New `McpClientService` (`service/mcp/`) is a real MCP
+*client* — it JSON-RPCs to the app's own `/mcp` endpoint over `HttpClientStreamableHttpTransport`
+rather than calling the search service in-process — and connects lazily on first use, because
+during context refresh the embedded Tomcat it dials isn't accepting connections yet. Flow is
+single-hop by design (master doc's Day 7 scope): grounded prompt → optional one `search_documents`
+call → fold the tool result back in → final answer. `GenerationTurn` is the new abstraction for
+"either a text answer or a tool the model wants invoked". Two live-run bugs fixed while testing
+the round trip: `GeminiGenerateRequest.Part` was missing a constructor matching its actual fields,
+and the follow-up request must echo Gemini's `thoughtSignature` on the function-call part or the
+API rejects it. Day 8 (next) is JWT auth + the React chat UI + session/message persistence.
+
 **Phase 1 — Day 6 MCP Tool Server (complete).** Built the `search_documents` MCP tool server using
 the official Java SDK (`io.modelcontextprotocol.sdk`) plus Spring AI's `spring-ai-starter-mcp-server-webmvc`
 starter, both at version `2.0.1` — confirmed compatible with Spring Boot 4.1 by resolving real
@@ -33,8 +47,6 @@ query semantic/Pinecone search can't answer (e.g. "documents uploaded this month
 complementary role the master doc's Section 7 describes. Verified live: `initialize`, `tools/list`,
 and `tools/call` all round-tripped correctly over real HTTP against the running app, including the
 SDK's own JSON-schema validation rejecting a bad `status` enum value before it reached our handler.
-Day 7 (next) wires an MCP *client* into `ChatService` so Gemini's function-calling can actually
-invoke this tool mid-conversation — today only proves the server side works standalone.
 
 **Phase 1 — Day 5 Eval Set (complete).** Big milestone this session: the app was actually run
 live for the first time (Days 1-4 had only ever been compile-checked, never booted) —
@@ -153,6 +165,29 @@ None blocking right now. Resolved items moved to Decisions Log above.
 
 ## Phase Log
 
+### Phase 1 — Day 7 MCP Client Wiring (completed 2026-09-05)
+- [x] `McpClientService` (`service/mcp/`) — MCP *client* that connects to the app's own `/mcp`
+      server over `HttpClientStreamableHttpTransport` (real JSON-RPC, not an in-process call);
+      exposes `listToolDeclarationsForGemini()` and `callTool(name, args)`
+- [x] Lazy connect on first use (double-checked `volatile` singleton) — connecting at startup
+      fails because the embedded Tomcat the client dials isn't up yet during context refresh
+- [x] `GenerationTurn` record — models "final text answer" vs. "tool the model wants invoked",
+      carrying the `thoughtSignature` Gemini requires echoed back
+- [x] `GeminiGenerationService.generate(contents, toolDeclarations)` — sends tool declarations,
+      parses a `functionCall` part out of the response, returns a `GenerationTurn`
+- [x] `ChatService.generateWithToolSupport()` — grounded prompt → if Gemini asks for a tool,
+      call it via MCP and feed the result back as a `functionResponse` part → final answer.
+      Single-hop (at most one tool call per query), matching master doc Day 7 scope
+- [x] `GeminiGenerateRequest`/`GeminiGenerateResponse` DTOs extended for `tools`, `functionCall`,
+      `functionResponse`, and `thoughtSignature`
+- [x] Fixed two bugs found testing the round trip live: `GeminiGenerateRequest.Part` missing a
+      constructor matching its fields; follow-up request rejected without the echoed `thoughtSignature`
+- [x] `./mvnw compile` clean
+- [ ] Not yet done: session/message persistence and auth — Day 8
+
+*(Next: Day 8 — JWT auth (register/login, role-based access), React chat UI, and persisting
+`sessionId` + question/answer as `Message` rows on `/api/chat/query`.)*
+
 ### Phase 1 — Day 6 MCP Tool Server (completed 2026-09-05)
 - [x] Researched actual Maven Central contents for the MCP Java SDK (`io.modelcontextprotocol.sdk`)
       and Spring AI's MCP server starters directly (directory listing + `maven-metadata.xml`), since
@@ -175,11 +210,8 @@ None blocking right now. Resolved items moved to Decisions Log above.
       non-match, a date-range non-match, and an invalid enum value (correctly rejected by the SDK's
       own JSON-schema validation before reaching our handler) — all against the real Neon-backed
       `documents` table (the `sample-hr-policy.pdf` row from Day 5's eval)
-- [ ] Not yet done: wiring an MCP *client* into `ChatService` so Gemini's function-calling can
-      actually invoke this tool during a real chat query — that's Day 7
-
-*(Next: Day 7 — wire MCP client into the ChatService orchestrator, test a tool-invoking query
-end-to-end.)*
+- [x] MCP *client* wired into `ChatService` so Gemini's function-calling can actually invoke this
+      tool during a real chat query — done Day 7 (see above)
 
 ### Phase 1 — Day 5 Eval Set (completed 2026-08-02)
 - [x] First-ever live run of the app (`./mvnw spring-boot:run` against real Neon/Gemini/Pinecone
