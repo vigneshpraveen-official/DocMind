@@ -5,6 +5,7 @@ import com.docmind.dto.PineconeVector;
 import com.docmind.entity.Chunk;
 import com.docmind.entity.Document;
 import com.docmind.entity.DocumentStatus;
+import com.docmind.entity.User;
 import com.docmind.repository.ChunkRepository;
 import com.docmind.repository.DocumentRepository;
 import com.docmind.service.embedding.GeminiEmbeddingService;
@@ -33,11 +34,12 @@ public class DocumentIngestionService {
     private final GeminiEmbeddingService geminiEmbeddingService;
     private final PineconeService pineconeService;
 
-    public DocumentUploadResponse ingest(MultipartFile file) {
+    public DocumentUploadResponse ingest(MultipartFile file, User uploadedBy) {
         validateFile(file);
 
         Document document = Document.builder()
                 .filename(file.getOriginalFilename())
+                .uploadedBy(uploadedBy)
                 .status(DocumentStatus.PROCESSING)
                 .build();
         document = documentRepository.save(document);

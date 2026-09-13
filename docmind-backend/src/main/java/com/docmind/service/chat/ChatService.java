@@ -4,6 +4,12 @@ import com.docmind.dto.ChatQueryResponse;
 import com.docmind.dto.GeminiGenerateRequest;
 import com.docmind.dto.PineconeQueryResponse;
 import com.docmind.dto.SourceReference;
+import com.docmind.entity.ConversationSession;
+import com.docmind.entity.Message;
+import com.docmind.entity.MessageRole;
+import com.docmind.entity.User;
+import com.docmind.repository.ConversationSessionRepository;
+import com.docmind.repository.MessageRepository;
 import com.docmind.service.embedding.GeminiEmbeddingService;
 import com.docmind.service.generation.GeminiGenerationService;
 import com.docmind.service.generation.GenerationTurn;
@@ -13,11 +19,13 @@ import com.docmind.service.mcp.McpClientService;
 import com.docmind.service.retrieval.PineconeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 @Slf4j
 @Service
@@ -31,8 +39,43 @@ public class ChatService {
     private final PromptBuilder promptBuilder;
     private final GeminiGenerationService geminiGenerationService;
     private final McpClientService mcpClientService;
+    private final ConversationSessionRepository conversationSessionRepository;
+    private final MessageRepository messageRepository;
 
-    public ChatQueryResponse query(String question) {
+    public ConversationSession createSession(User user) {
+        ConversationSession session = ConversationSession.builder().user(user).build();
+        return conversationSessionRepository.save(session);
+    }
+
+    public List<Message> getMessages(Long sessionId, User requester) {
+        ConversationSession session = requireOwnedSession(sessionId, requester);
+        return messageRepository.findBySessionIdOrderByCreatedAtAsc(session.getId());
+    }
+
+    public ChatQueryResponse query(Long sessionId, String question, User requester) {
+        ConversationSession session = requireOwnedSession(sessionId, requester);
+
+        messageRepository.save(Message.builder()
+                .session(session).role(MessageRole.USER).content(question).build());
+
+        ChatQueryResponse response = answer(question);
+
+        messageRepository.save(Message.builder()
+                .session(session).role(MessageRole.ASSISTANT).content(response.getAnswer()).build());
+
+        return response;
+    }
+
+    private ConversationSession requireOwnedSession(Long sessionId, User requester) {
+        ConversationSession session = conversationSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new NoSuchElementException("No chat session found with id " + sessionId));
+        if (!session.getUser().getId().equals(requester.getId())) {
+            throw new AccessDeniedException("You do not have access to this chat session");
+        }
+        return session;
+    }
+
+    private ChatQueryResponse answer(String question) {
         float[] queryVector = geminiEmbeddingService.embed(question, GeminiEmbeddingService.TASK_TYPE_QUERY);
 
         PineconeQueryResponse pineconeResponse = pineconeService.query(queryVector, TOP_K);

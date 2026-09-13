@@ -3,14 +3,15 @@ package com.docmind.controller;
 import com.docmind.dto.ChunkResponse;
 import com.docmind.dto.DocumentSummaryResponse;
 import com.docmind.dto.DocumentUploadResponse;
-import com.docmind.entity.Document;
 import com.docmind.repository.ChunkRepository;
 import com.docmind.repository.DocumentRepository;
+import com.docmind.service.auth.UserPrincipal;
 import com.docmind.service.document.DocumentIngestionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -27,8 +28,11 @@ public class DocumentController {
     private final ChunkRepository chunkRepository;
 
     @PostMapping(value = "/upload", consumes = "multipart/form-data")
-    public ResponseEntity<DocumentUploadResponse> upload(@RequestParam("file") MultipartFile file) {
-        DocumentUploadResponse response = documentIngestionService.ingest(file);
+    public ResponseEntity<DocumentUploadResponse> upload(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal UserPrincipal principal
+    ) {
+        DocumentUploadResponse response = documentIngestionService.ingest(file, principal.user());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

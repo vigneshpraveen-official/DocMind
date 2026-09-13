@@ -23,6 +23,53 @@
 
 ## Current Phase
 
+**Phase 1 — Day 8 Auth + Persistence + Frontend (in progress).** JWT auth, session/message
+persistence, and a React chat UI are built; live end-to-end verification is blocked on a Neon
+Postgres connectivity issue (see below), not yet confirmed working against the real app.
+
+Backend:
+- `AuthController` (`POST /api/auth/register`, `/login`) issues an HS256 JWT (`JwtService`,
+  `io.jsonwebtoken` 0.12.6) containing `sub`=username, `userId`, `role`. `AuthService` hashes
+  passwords with BCrypt and delegates login to Spring Security's `AuthenticationManager` /
+  `DaoAuthenticationProvider`.
+- `JwtAuthenticationFilter` (a `OncePerRequestFilter`) reads `Authorization: Bearer <token>`,
+  validates it via `JwtService`, and populates the `SecurityContext` with a `UserPrincipal`
+  (wraps the `User` entity as `UserDetails` rather than making the entity itself implement it).
+- `SecurityConfig` rewritten from permit-all: `/api/auth/**`, `/api/health`, `/mcp/**` stay public
+  (the last one because `McpClientService` calls its own `/mcp` endpoint over loopback HTTP with
+  no credentials — see Day 7's internal MCP client); `POST /api/documents/upload` requires
+  `ADMIN`/`STAFF`; everything else requires authentication. CORS configured explicitly (not
+  permit-all) for `http://localhost:*` since the Authorization header + credentials are in play.
+- `DocumentController.upload` now takes `@AuthenticationPrincipal UserPrincipal` and records
+  `Document.uploadedBy` — this was a schema column with nothing ever writing to it until now.
+- `ChatService` split into `createSession(user)`, `getMessages(sessionId, requester)`, and
+  `query(sessionId, question, requester)`. Every query is now persisted as a `USER` message
+  followed by an `ASSISTANT` message on the given `ConversationSession`. Session ownership is
+  checked on every access (`requireOwnedSession`) — a `sessionId` belonging to another user
+  404s... actually 403s (session exists, just not yours) via `AccessDeniedException`; a
+  nonexistent one 404s via `NoSuchElementException`. `ChatQueryRequest` now requires `sessionId`.
+- New endpoints matching master doc Section 5 exactly: `POST /api/chat/sessions` (create),
+  `GET /api/chat/sessions/{id}/messages` (owner-only history).
+
+Frontend (`docmind-frontend/`, scaffolded fresh this session via Vite + React, not present
+before): JWT stored in `localStorage` via `AuthContext`; `api.js` is a thin fetch wrapper that
+attaches the bearer token. Pages: `LoginPage`, `RegisterPage`, `ChatPage` (creates a session on
+mount, renders the conversation, shows `sources` as chips under each answer — the same
+"visibly prove grounding" detail the master doc calls out), `DocumentsPage` (lists documents,
+upload control gated to `ADMIN`/`STAFF` client-side — the real enforcement is server-side via
+`SecurityConfig`). `npx vite build` succeeds; **not yet run against the live backend** (see
+blocker below), so the auth → chat → sources round trip is unverified end to end.
+
+⚠️ **Session blocker, not a code issue:** the Neon Postgres hostname in `.env` (`DB_URL`) no
+longer resolves — `UnknownHostException` on `ep-royal-mode-axua2pop-pooler....neon.tech`, even
+though outbound internet access otherwise works fine (confirmed via `curl` to `api.github.com`
+and DNS resolution of the bare `neon.tech` domain). Likely an expired/rotated Neon endpoint
+(free-tier branches can be deleted after long idle periods) rather than anything wrong in code —
+`./mvnw compile` is clean. User is updating `.env` with a fresh connection string from the Neon
+console; once that's in place, re-run `./mvnw spring-boot:run`, confirm `GET /api/health` is
+all-green, then manually walk register → login → create session → upload a doc (as ADMIN/STAFF)
+→ ask a question → confirm sources render, from the React UI.
+
 **Phase 1 — Day 7 MCP Client Wiring (complete).** `ChatService` now hands Gemini the MCP tool
 declarations alongside the grounded prompt, so the model can invoke `search_documents` (built
 Day 6) mid-answer for structured questions the retrieved Pinecone chunks can't cover (e.g. "how
@@ -124,6 +171,10 @@ from this project — see `eval/results.md` for the full scoring table and reaso
 | 2026-09-05 | Used `io.modelcontextprotocol.sdk:mcp-bom:2.0.1` + `org.springframework.ai:spring-ai-starter-mcp-server-webmvc:2.0.1` (via `spring-ai-bom`), not the older `io.modelcontextprotocol.sdk:mcp-spring-webmvc` artifact | That older artifact is frozen at `0.18.4` (pre-1.0, last released before the SDK's 1.x/2.x rename) — confirmed by listing actual Maven Central directory contents, since web searches for "MCP Java SDK Maven coordinates" returned plausible-looking but inconsistent/wrong version numbers and code samples (WebFetch summarization of vendor docs, not the docs themselves). Spring AI 2.0.1 repackages the WebMVC transport as `org.springframework.ai:mcp-spring-webmvc:2.0.1` internally, which does line up with the `mcp-core:2.0.0`/`mcp:2.0.0` the BOM pulls in. Verified the whole stack actually works by running the app live, not just compiling — see below. |
 | 2026-09-05 | `spring.ai.mcp.server.protocol: STREAMABLE` set explicitly in `application.yml`, even though `STREAMABLE` is the documented default | Decompiled the actual autoconfiguration class (`McpServerAutoConfiguration$EnabledStreamableServerCondition`) after the endpoint 404'd with no config set: the `@ConditionalOnProperty` gating the streamable-HTTP transport bean has `matchIfMissing=false`, so the Java field's default value never takes effect unless the property is bound from *some* config source. This is a real gotcha in the current SDK version — anyone wiring this up from the docs alone (which don't mention needing to set a "default" value explicitly) will hit the same silent 404. |
 | 2026-09-05 | `search_documents` tool filters `documentRepository.findAll()` in Java (`DocumentSearchService`) rather than adding 6+ derived-query-method overloads to `DocumentRepository` for every combination of optional filters | Considered the derived-query approach first, rejected it as combinatorial-explosion overkill for a single-user portfolio project's document count. Matches this project's existing bias (see 2026-07-30 entry) toward simplicity over premature abstraction at this scale. |
+| 2026-09-14 | JWT implemented with `io.jsonwebtoken` (jjwt) 0.12.6 (`jjwt-api`/`jjwt-impl`/`jjwt-jackson`), a separate Jackson 2.x dependency alongside the project's existing `tools.jackson.core:jackson-databind` (Jackson 3.x) | jjwt-jackson only supports Jackson 2's classes for its JSON (de)serializer; since the groupIds/packages differ (`com.fasterxml.jackson.*` vs `tools.jackson.*`) both coexist on the classpath without conflict. Confirmed via clean `./mvnw compile`. |
+| 2026-09-14 | `User` does not implement `UserDetails` directly; a separate `UserPrincipal` wrapper class does | Keeps Spring Security's authentication contract out of the JPA entity. `UserPrincipal.user()` unwraps back to the real `User` for use in `@AuthenticationPrincipal`-injected controller methods that need the entity (e.g. `DocumentController.upload` setting `uploadedBy`). |
+| 2026-09-14 | `/mcp/**` and `/api/health` left `permitAll()` in `SecurityConfig`, not locked behind auth | `McpClientService` (Day 7) calls the app's own `/mcp` endpoint over loopback HTTP with no credentials — locking it down would break the tool-calling round trip. `/api/health` is an ops/monitoring endpoint with no sensitive data, conventionally left open. |
+| 2026-09-14 | `ChatQueryRequest.sessionId` is now required (`@NotNull`), not auto-created server-side when absent | Matches master doc Section 5's two-step flow (`POST /api/chat/sessions` then `POST /api/chat/query`) exactly, and keeps `ChatService.query` a pure "append to this session" operation rather than having hidden session-creation side effects. Frontend's `ChatPage` calls `createSession` once on mount to match. |
 
 ## Environment / Credentials Status
 
@@ -135,8 +186,8 @@ has been provided and is sitting in the local (gitignored) `.env`.
 |---|---|---|
 | Gemini API key | **Confirmed working** (2026-08-02) | In `.env`, verified live via `GET /api/health` and the Day 5 eval (dozens of real embed/generate calls) |
 | Pinecone API key + index host | **Confirmed working** (2026-08-02) | In `.env`, verified live — upsert and query both confirmed against the real `docmind` index (dimension 768) |
-| Neon Postgres connection string | **Confirmed working** (2026-08-02) | In `.env`; `DB_URL` had to be corrected (credentials were embedded in the URL, which the JDBC driver rejects — see Decisions Log). Flyway migration applies cleanly against it. |
-| JWT secret | Generated, sitting in `.env` | Not yet used — auth isn't built until Day 8 |
+| Neon Postgres connection string | ⚠️ **Broken as of 2026-09-14** | Hostname in `DB_URL` no longer resolves (`UnknownHostException`) — likely an expired/rotated Neon free-tier endpoint. Worked as recently as Day 7 (2026-09-05). User is fetching a fresh connection string from the Neon console; app cannot boot until `.env` is updated. |
+| JWT secret | Generated, sitting in `.env` | **Now in use** as of Day 8 (2026-09-14) — signs/verifies HS256 tokens via `JwtService`. 88 chars, well over the 32-byte HS256 minimum. |
 | GitHub push access | Verified working | SSH key authenticated as `vigneshpraveen-official`. Remote `origin`: `git@github.com:vigneshpraveen-official/DocMind.git`. Days 1-4 commits already pushed. |
 
 ---
@@ -164,6 +215,32 @@ None blocking right now. Resolved items moved to Decisions Log above.
 ---
 
 ## Phase Log
+
+### Phase 1 — Day 8 Auth + Persistence + Frontend (in progress, started 2026-09-14)
+- [x] Added `io.jsonwebtoken` (jjwt) 0.12.6 to `pom.xml`
+- [x] `JwtService` — generate/parse/validate HS256 tokens (`sub`=username, `userId`, `role` claims)
+- [x] `UserPrincipal` (`UserDetails` wrapper) + `CustomUserDetailsService`
+- [x] `JwtAuthenticationFilter` — reads `Authorization: Bearer`, populates `SecurityContext`
+- [x] `AuthService`/`AuthController` — `POST /api/auth/register`, `/login`, BCrypt password hashing
+- [x] `SecurityConfig` rewritten: role-gated `/api/documents/upload`, authenticated-by-default,
+      explicit CORS config, `/api/auth/**`+`/api/health`+`/mcp/**` public
+- [x] `DocumentController.upload` records `Document.uploadedBy` from the authenticated principal
+- [x] `ChatService` split into `createSession`/`getMessages`/`query`; every query now persists a
+      `USER` + `ASSISTANT` `Message` row; session ownership enforced on every access
+- [x] New endpoints: `POST /api/chat/sessions`, `GET /api/chat/sessions/{id}/messages`
+- [x] `./mvnw compile` clean
+- [x] Scaffolded `docmind-frontend/` (Vite + React + react-router-dom): `AuthContext`, `api.js`,
+      `LoginPage`, `RegisterPage`, `ChatPage` (session-per-visit, renders sources as chips),
+      `DocumentsPage` (upload gated to ADMIN/STAFF client-side)
+- [x] `npx vite build` clean
+- [ ] **Blocked:** live end-to-end verification (register → login → upload → query → sources) —
+      Neon Postgres hostname in `.env` doesn't resolve, see Environment/Credentials Status above.
+      Not a code issue; resume here once `.env` has a working `DB_URL`.
+- [ ] Not yet done: role-based UI niceties beyond gating the upload button (e.g. an admin-only
+      user list), any password-reset flow (out of master doc's scope)
+
+*(Next: finish Day 8's live verification once Neon access is restored, then Day 9 — deploy
+(Render + Neon + Pinecone cloud), README, final test pass.)*
 
 ### Phase 1 — Day 7 MCP Client Wiring (completed 2026-09-05)
 - [x] `McpClientService` (`service/mcp/`) — MCP *client* that connects to the app's own `/mcp`
