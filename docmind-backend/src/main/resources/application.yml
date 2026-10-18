@@ -39,6 +39,8 @@ server:
   port: ${SERVER_PORT:8080}
 
 docmind:
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*}
   gemini:
     api-key: ${GEMINI_API_KEY}
     embedding-model: gemini-embedding-001

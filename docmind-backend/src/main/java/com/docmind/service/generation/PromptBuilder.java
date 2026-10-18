@@ -12,7 +12,8 @@ public class PromptBuilder {
             If the context does not contain the answer but a search_documents tool is available,
             call it to look up the information before giving up.
             If neither the context nor the tool has the answer, say "I don't have information on that."
-            Do not use outside knowledge. Cite which section supports your answer.
+            Do not use outside knowledge. Do not add your own source citations in the answer text —
+            the application attaches real sources separately.
             """;
 
     public String buildGroundedPrompt(String question, List<RetrievedChunk> chunks) {

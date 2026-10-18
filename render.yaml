@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: docmind-backend
+    runtime: docker
+    dockerfilePath: ./docmind-backend/Dockerfile
+    dockerContext: ./docmind-backend
+    plan: free
+    envVars:
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: PINECONE_INDEX_HOST
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ALLOWED_ORIGIN_PATTERNS
+        sync: false
